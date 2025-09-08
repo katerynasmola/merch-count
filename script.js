@@ -1,14 +1,27 @@
 const ITEMS = [
   { key: 'pen', label: 'Ручка' },
-  { key: 'tshirt_white', label: 'Футболка біла' },
-  { key: 'tshirt_black', label: 'Футболка чорна' },
+  { key: 'tshirt_white_male', label: 'Футболка біла чоловіча', sizes: ['S','M','L','XL','XXL'] },
+  { key: 'tshirt_white_female', label: 'Футболка біла жіноча', sizes: ['XS','S','M','L','XL','XXL'] },
+  { key: 'tshirt_black_male', label: 'Футболка чорна чоловіча', sizes: ['S','M','L','XL','XXL'] },
+  { key: 'tshirt_black_female', label: 'Футболка чорна жіноча', sizes: ['XS','S','M','L','XL','XXL'] },
   { key: 'notebook', label: 'Блокнот' },
+  { key: 'water_bottle', label: 'Пляшка для води' },
   { key: 'box', label: 'Бокс' },
-  { key: 'stickers', label: 'Наліпки' },
+  { key: 'stickers', label: 'Стікерпак' },
+  { key: 'pen_pad', label: 'Підкладка під ручку' },
+  { key: 'lanyard', label: 'Стрічка для пропуска' },
+  { key: 'badge', label: 'Бейдж для пропуска' },
   { key: 'postcards', label: 'Листівки' }
 ];
 
-const state = Object.fromEntries(ITEMS.map((i) => [i.key, 0]));
+const state = ITEMS.reduce((acc, item) => {
+  if (item.sizes) {
+    acc[item.key] = Object.fromEntries(item.sizes.map((s) => [s, 0]));
+  } else {
+    acc[item.key] = 0;
+  }
+  return acc;
+}, {});
 let composedBoxes = 0;
 
 // Supabase configuration
@@ -124,8 +137,21 @@ function $all(selector, root = document) {
 function updateUI() {
   $all('.item').forEach((el) => {
     const key = el.dataset.key;
-    const valueEl = $('.counter__value', el);
-    valueEl.textContent = String(state[key]);
+    const item = ITEMS.find((i) => i.key === key);
+    if (!item) return;
+
+    if (item.sizes) {
+      // Handle items with sizes (t-shirts)
+      $all('.size', el).forEach((sizeEl) => {
+        const size = sizeEl.getAttribute('data-size');
+        const inputEl = $('.counter__input', sizeEl);
+        if (size && inputEl) inputEl.value = String(state[key][size]);
+      });
+    } else {
+      // Handle simple items
+      const inputEl = $('.counter__input', el);
+      if (inputEl) inputEl.value = String(state[key]);
+    }
   });
 
   $('#boxesCount').textContent = String(composedBoxes);
@@ -134,31 +160,105 @@ function updateUI() {
   scheduleSave();
 }
 
-function increment(key) {
-  state[key] += 1;
+function increment(key, size = null) {
+  if (size) {
+    state[key][size] += 1;
+  } else {
+    state[key] += 1;
+  }
   updateUI();
 }
 
-function decrement(key) {
-  if (state[key] > 0) {
-    state[key] -= 1;
-    updateUI();
+function decrement(key, size = null) {
+  if (size) {
+    if (state[key][size] > 0) {
+      state[key][size] -= 1;
+    }
+  } else {
+    if (state[key] > 0) {
+      state[key] -= 1;
+    }
   }
+  updateUI();
+}
+
+function sumSizesByKey(itemKey) {
+  return Object.values(state[itemKey]).reduce((a, b) => a + b, 0);
 }
 
 function canComposeBox() {
-  return ITEMS.every((item) => state[item.key] > 0);
+  // Require at least one white tee (male or female) and one black tee (male or female)
+  const whiteOk = sumSizesByKey('tshirt_white_male') + sumSizesByKey('tshirt_white_female') > 0;
+  const blackOk = sumSizesByKey('tshirt_black_male') + sumSizesByKey('tshirt_black_female') > 0;
+
+  const othersOk = ITEMS.every((item) => {
+    if (item.key.startsWith('tshirt_')) return true; // handled above
+    if (item.sizes) {
+      return Object.values(state[item.key]).reduce((a, b) => a + b, 0) > 0;
+    }
+    return state[item.key] > 0;
+  });
+
+  return whiteOk && blackOk && othersOk;
 }
 
 function composeBox() {
   const messageEl = $('#message');
   if (!canComposeBox()) {
-    const lacking = ITEMS.filter((i) => state[i.key] <= 0).map((i) => i.label);
+    const lacking = [];
+    if (sumSizesByKey('tshirt_white_male') + sumSizesByKey('tshirt_white_female') <= 0) {
+      lacking.push('Футболка біла (будь-яка)');
+    }
+    if (sumSizesByKey('tshirt_black_male') + sumSizesByKey('tshirt_black_female') <= 0) {
+      lacking.push('Футболка чорна (будь-яка)');
+    }
+    ITEMS.forEach((item) => {
+      if (item.key.startsWith('tshirt_')) return;
+      if (item.sizes) {
+        const sum = Object.values(state[item.key]).reduce((a, b) => a + b, 0);
+        if (sum <= 0) lacking.push(item.label);
+      } else if (state[item.key] <= 0) {
+        lacking.push(item.label);
+      }
+    });
     messageEl.textContent = `Недостатньо: ${lacking.join(', ')}`;
     return;
   }
 
-  ITEMS.forEach((i) => (state[i.key] -= 1));
+  // Decrement white tee (prefer XXL -> XS)
+  const whiteOrder = ['tshirt_white_male', 'tshirt_white_female'];
+  for (const k of whiteOrder) {
+    const sizes = ITEMS.find((i) => i.key === k).sizes;
+    for (let idx = sizes.length - 1; idx >= 0; idx -= 1) {
+      const size = sizes[idx];
+      if (state[k][size] > 0) { state[k][size] -= 1; break; }
+    }
+  }
+
+  // Decrement black tee (prefer XXL -> XS)
+  const blackOrder = ['tshirt_black_male', 'tshirt_black_female'];
+  for (const k of blackOrder) {
+    const sizes = ITEMS.find((i) => i.key === k).sizes;
+    for (let idx = sizes.length - 1; idx >= 0; idx -= 1) {
+      const size = sizes[idx];
+      if (state[k][size] > 0) { state[k][size] -= 1; break; }
+    }
+  }
+
+  // Decrement other items
+  ITEMS.forEach((item) => {
+    if (item.key.startsWith('tshirt_')) return;
+    if (item.sizes) {
+      const sizesOrder = item.sizes;
+      for (let idx = sizesOrder.length - 1; idx >= 0; idx -= 1) {
+        const size = sizesOrder[idx];
+        if (state[item.key][size] > 0) { state[item.key][size] -= 1; break; }
+      }
+    } else {
+      state[item.key] -= 1;
+    }
+  });
+
   composedBoxes += 1;
   messageEl.textContent = 'Бокс складено!';
   updateUI();
@@ -169,13 +269,54 @@ function attachHandlers() {
 
   $all('.item').forEach((el) => {
     const key = el.dataset.key;
+    const item = ITEMS.find((i) => i.key === key);
     el.addEventListener('click', (e) => {
       const target = e.target;
       if (!(target instanceof Element)) return;
       const action = target.getAttribute('data-action');
-      if (action === 'increment') increment(key);
-      if (action === 'decrement') decrement(key);
+      
+      if (!item?.sizes) {
+        // Simple items
+        if (action === 'increment') increment(key);
+        if (action === 'decrement') decrement(key);
+      } else {
+        // Items with sizes (t-shirts)
+        const sizeEl = target.closest('.size');
+        if (!sizeEl) return;
+        const size = sizeEl.getAttribute('data-size');
+        if (!size) return;
+        
+        if (action === 'increment') increment(key, size);
+        if (action === 'decrement') decrement(key, size);
+      }
     });
+
+    // Handle manual input for simple items
+    if (!item?.sizes) {
+      const inputEl = $('.counter__input', el);
+      if (inputEl) {
+        inputEl.addEventListener('input', () => {
+          const raw = inputEl.value.trim();
+          const parsed = Math.max(0, Number.parseInt(raw === '' ? '0' : raw, 10));
+          state[key] = Number.isFinite(parsed) ? parsed : 0;
+          updateUI();
+        });
+      }
+    } else {
+      // Handle manual input for sized items
+      $all('.size', el).forEach((sizeEl) => {
+        const size = sizeEl.getAttribute('data-size');
+        const inputEl = $('.counter__input', sizeEl);
+        if (!size || !inputEl) return;
+        
+        inputEl.addEventListener('input', () => {
+          const raw = inputEl.value.trim();
+          const parsed = Math.max(0, Number.parseInt(raw === '' ? '0' : raw, 10));
+          state[key][size] = Number.isFinite(parsed) ? parsed : 0;
+          updateUI();
+        });
+      });
+    }
   });
 }
 
