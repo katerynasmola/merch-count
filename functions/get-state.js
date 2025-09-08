@@ -1,13 +1,30 @@
-exports.handler = async () => {
+const fs = require('fs');
+const path = require('path');
+
+exports.handler = async (event) => {
   try {
-    console.log('get-state called');
+    console.log('=== GET-STATE CALLED ===');
     
-    // For now, just return empty state without using Blobs
-    // We'll add Blobs back once we confirm the function is being called
+    // Try to read state from file
+    const stateFile = path.join('/tmp', 'app-state.json');
+    let state = {};
+    
+    try {
+      if (fs.existsSync(stateFile)) {
+        const data = fs.readFileSync(stateFile, 'utf8');
+        state = JSON.parse(data);
+        console.log('State loaded from file:', state);
+      } else {
+        console.log('No state file found, returning empty state');
+      }
+    } catch (fileError) {
+      console.log('Error reading state file:', fileError.message);
+    }
+    
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify(state),
     };
   } catch (error) {
     console.error('Error in get-state:', error);

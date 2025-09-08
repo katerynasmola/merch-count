@@ -1,7 +1,10 @@
+const fs = require('fs');
+const path = require('path');
+
 exports.handler = async (event) => {
   try {
-    console.log('set-state called with method:', event.httpMethod);
-    console.log('set-state body:', event.body);
+    console.log('=== SET-STATE CALLED ===');
+    console.log('Method:', event.httpMethod);
     
     if (event.httpMethod !== 'POST') {
       console.log('Method not allowed:', event.httpMethod);
@@ -11,12 +14,24 @@ exports.handler = async (event) => {
     const newState = JSON.parse(event.body);
     console.log('Parsed state:', newState);
     
-    // For now, just return success without using Blobs
-    // We'll add Blobs back once we confirm the function is being called
+    // Save state to file
+    const stateFile = path.join('/tmp', 'app-state.json');
+    try {
+      fs.writeFileSync(stateFile, JSON.stringify(newState, null, 2));
+      console.log('State saved to file successfully');
+    } catch (fileError) {
+      console.error('Error saving state file:', fileError.message);
+      return { 
+        statusCode: 500, 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Failed to save state file' })
+      };
+    }
+    
     return { 
       statusCode: 200, 
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ success: true, message: 'State received' })
+      body: JSON.stringify({ success: true, message: 'State saved' })
     };
   } catch (error) {
     console.error('Error in set-state:', error);
