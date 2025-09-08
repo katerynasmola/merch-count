@@ -232,6 +232,9 @@ function updateUI() {
 
   $('#boxesCount').textContent = String(composedBoxes);
   checkThresholdsAndNotify();
+  
+  // Save to remote state
+  saveStateToBlobs();
 }
 
 function increment(key) {
@@ -695,13 +698,50 @@ function revertComposeEntry(entry) {
   });
 }
 
+// Debounced save to remote state
+let saveTimeout = null;
+function saveStateToBlobs() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    try {
+      await fetch('/.netlify/functions/set-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state)
+      });
+    } catch (error) {
+      console.warn('Failed to save state to remote:', error);
+    }
+  }, 1000); // 1 second debounce
+}
+
+// Load state from remote
+async function loadStateFromBlobs() {
+  try {
+    const response = await fetch('/.netlify/functions/get-state');
+    if (response.ok) {
+      const remoteState = await response.json();
+      return remoteState;
+    }
+  } catch (error) {
+    console.warn('Failed to load remote state:', error);
+  }
+  return null;
+}
+
 async function init() {
-  loadAppState();
-  seedInitialInventoryIfEmpty();
-  seedShirtSizesIfNotSeeded();
-  // Load shared remote state, then render
-  const remote = await fetchRemoteState();
-  await applyRemoteState(remote);
+  // Try to load remote state first
+  const remoteState = await loadStateFromBlobs();
+  if (remoteState && Object.keys(remoteState).length > 0) {
+    // Use remote state if available
+    Object.assign(state, remoteState);
+  } else {
+    // Fallback to local storage
+    loadAppState();
+    seedInitialInventoryIfEmpty();
+    seedShirtSizesIfNotSeeded();
+  }
+  
   attachHandlers();
   updateUI();
 }
