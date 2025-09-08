@@ -1,6 +1,3 @@
-const fs = require('fs');
-const path = require('path');
-
 exports.handler = async (event) => {
   try {
     console.log('=== SET-STATE CALLED ===');
@@ -14,19 +11,9 @@ exports.handler = async (event) => {
     const newState = JSON.parse(event.body);
     console.log('Parsed state:', newState);
     
-    // Save state to file
-    const stateFile = path.join('/tmp', 'app-state.json');
-    try {
-      fs.writeFileSync(stateFile, JSON.stringify(newState, null, 2));
-      console.log('State saved to file successfully');
-    } catch (fileError) {
-      console.error('Error saving state file:', fileError.message);
-      return { 
-        statusCode: 500, 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Failed to save state file' })
-      };
-    }
+    // Save state to environment variable
+    process.env.APP_STATE = JSON.stringify(newState);
+    console.log('State saved to environment variable');
     
     return { 
       statusCode: 200, 

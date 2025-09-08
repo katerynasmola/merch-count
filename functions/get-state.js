@@ -1,24 +1,17 @@
-const fs = require('fs');
-const path = require('path');
-
 exports.handler = async (event) => {
   try {
     console.log('=== GET-STATE CALLED ===');
     
-    // Try to read state from file
-    const stateFile = path.join('/tmp', 'app-state.json');
+    // Try to get state from environment variable
+    const stateJson = process.env.APP_STATE || '{}';
     let state = {};
     
     try {
-      if (fs.existsSync(stateFile)) {
-        const data = fs.readFileSync(stateFile, 'utf8');
-        state = JSON.parse(data);
-        console.log('State loaded from file:', state);
-      } else {
-        console.log('No state file found, returning empty state');
-      }
-    } catch (fileError) {
-      console.log('Error reading state file:', fileError.message);
+      state = JSON.parse(stateJson);
+      console.log('State loaded from environment:', state);
+    } catch (parseError) {
+      console.log('Error parsing state from environment:', parseError.message);
+      state = {};
     }
     
     return {
