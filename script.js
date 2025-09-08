@@ -532,6 +532,65 @@ function saveAppState() {
   } catch (_) {}
 }
 
+async function fetchRemoteState() {
+  try {
+    const res = await fetch('/.netlify/functions/get-state');
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_) { return null; }
+}
+
+async function pushRemoteState(payload) {
+  try {
+    await fetch('/.netlify/functions/set-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (_) {}
+}
+
+function getSerializableState() {
+  const out = {};
+  ITEMS.forEach((item) => {
+    if (item.sizes) out[item.key] = { ...state[item.key] };
+    else out[item.key] = state[item.key];
+  });
+  out.composedBoxes = composedBoxes;
+  return out;
+}
+
+let remoteSaveTimer = null;
+function scheduleRemoteSave() {
+  if (remoteSaveTimer) clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = setTimeout(() => {
+    pushRemoteState(getSerializableState());
+  }, 400);
+}
+
+// Hook into saveAppState to also push remote
+const _saveAppStateOrig = saveAppState;
+saveAppState = function() {
+  _saveAppStateOrig();
+  scheduleRemoteSave();
+};
+
+async function applyRemoteState(remote) {
+  if (!remote) return;
+  ITEMS.forEach((item) => {
+    if (item.sizes && remote[item.key]) {
+      item.sizes.forEach((sz) => {
+        const val = Number.parseInt(remote[item.key][sz] ?? state[item.key][sz] ?? 0, 10);
+        state[item.key][sz] = Number.isFinite(val) ? val : 0;
+      });
+    } else if (!item.sizes && typeof remote[item.key] !== 'undefined') {
+      const val = Number.parseInt(remote[item.key], 10);
+      state[item.key] = Number.isFinite(val) ? val : state[item.key];
+    }
+  });
+  if (typeof remote.composedBoxes === 'number') composedBoxes = remote.composedBoxes;
+}
+
 // One-time seeding of shirt sizes as requested
 function seedShirtSizesIfNotSeeded() {
   try {
@@ -636,10 +695,13 @@ function revertComposeEntry(entry) {
   });
 }
 
-function init() {
+async function init() {
   loadAppState();
   seedInitialInventoryIfEmpty();
   seedShirtSizesIfNotSeeded();
+  // Load shared remote state, then render
+  const remote = await fetchRemoteState();
+  await applyRemoteState(remote);
   attachHandlers();
   updateUI();
 }
