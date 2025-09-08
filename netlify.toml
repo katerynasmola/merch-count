@@ -7,5 +7,9 @@
 
 [build.environment]
   NODE_VERSION = "18.20.2"
+  # Provide a token with Blobs write access. Add this in Netlify UI → Site settings → Environment variables
+  # NETLIFY_TOKEN = "<YOUR_NETLIFY_PERSONAL_ACCESS_TOKEN>"
+  # Optional: SITE_ID to namespace the blob key across environments
+  # SITE_ID = "prod"
 
 
