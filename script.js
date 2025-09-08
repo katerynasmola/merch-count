@@ -520,6 +520,12 @@ function attachHandlers() {
       setTimeout(() => (savedMsg.textContent = ''), 2000);
     });
   }
+  
+  // Sync button handler
+  const syncBtn = $('#syncButton');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', syncWithServer);
+  }
 }
 
 const STATE_KEYS = {
@@ -701,14 +707,17 @@ function revertComposeEntry(entry) {
 // Debounced save to remote state
 let saveTimeout = null;
 function saveStateToBlobs() {
+  console.log('saveStateToBlobs called');
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(async () => {
     try {
-      await fetch('/.netlify/functions/set-state', {
+      console.log('Saving state to remote:', state);
+      const response = await fetch('/.netlify/functions/set-state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(state)
       });
+      console.log('set-state response:', response.status, response.statusText);
     } catch (error) {
       console.warn('Failed to save state to remote:', error);
     }
@@ -718,9 +727,12 @@ function saveStateToBlobs() {
 // Load state from remote
 async function loadStateFromBlobs() {
   try {
+    console.log('Loading state from remote...');
     const response = await fetch('/.netlify/functions/get-state');
+    console.log('get-state response:', response.status, response.statusText);
     if (response.ok) {
       const remoteState = await response.json();
+      console.log('Remote state loaded:', remoteState);
       return remoteState;
     }
   } catch (error) {
@@ -730,20 +742,48 @@ async function loadStateFromBlobs() {
 }
 
 async function init() {
-  // Try to load remote state first
-  const remoteState = await loadStateFromBlobs();
-  if (remoteState && Object.keys(remoteState).length > 0) {
-    // Use remote state if available
-    Object.assign(state, remoteState);
-  } else {
-    // Fallback to local storage
-    loadAppState();
-    seedInitialInventoryIfEmpty();
-    seedShirtSizesIfNotSeeded();
-  }
+  // Load from local storage first
+  loadAppState();
+  seedInitialInventoryIfEmpty();
+  seedShirtSizesIfNotSeeded();
   
   attachHandlers();
   updateUI();
+}
+
+// Sync functionality
+async function syncWithServer() {
+  const statusEl = $('#syncStatus');
+  const buttonEl = $('#syncButton');
+  
+  try {
+    buttonEl.disabled = true;
+    buttonEl.textContent = 'Синхронізація...';
+    statusEl.textContent = '';
+    
+    // Load remote state
+    const remoteState = await loadStateFromBlobs();
+    if (remoteState && Object.keys(remoteState).length > 0) {
+      // Merge with local state (remote takes priority)
+      Object.assign(state, remoteState);
+      saveAppState();
+      updateUI();
+      statusEl.textContent = 'Синхронізація успішна!';
+      statusEl.className = 'sync-status success';
+    } else {
+      // Save local state to remote
+      await saveStateToBlobs();
+      statusEl.textContent = 'Локальні дані збережено на сервері';
+      statusEl.className = 'sync-status success';
+    }
+  } catch (error) {
+    console.error('Sync error:', error);
+    statusEl.textContent = 'Помилка синхронізації: ' + error.message;
+    statusEl.className = 'sync-status error';
+  } finally {
+    buttonEl.disabled = false;
+    buttonEl.textContent = 'Синхронізувати з сервером';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
