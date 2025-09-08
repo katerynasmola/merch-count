@@ -29,7 +29,7 @@ const SUPABASE_URL = 'https://yhnikfjyxthkrmoqmpdy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlobmlrZmp5eHRoa3Jtb3FtcGR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNjc3MDAsImV4cCI6MjA3Mjk0MzcwMH0.2RnIxl2HMoL4bZPzeLzXSnV0fjUcZNWUHMIvkal2Ma4';
 
 // Initialize Supabase client
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let supabase;
 
 // Auto-sync functionality
 let saveTimeout = null;
@@ -64,6 +64,11 @@ async function loadStateFromServer() {
 }
 
 async function saveStateToServer() {
+  if (!supabase) {
+    console.warn('Supabase not available, skipping server save');
+    return false;
+  }
+  
   try {
     const stateToSave = {
       ...state,
@@ -146,6 +151,20 @@ function updateUI() {
         const size = sizeEl.getAttribute('data-size');
         const inputEl = $('.counter__input', sizeEl);
         if (size && inputEl) inputEl.value = String(state[key][size]);
+        
+        // Ensure checkbox exists
+        let chk = $('.size__check', sizeEl);
+        if (!chk) {
+          chk = document.createElement('input');
+          chk.type = 'checkbox';
+          chk.className = 'size__check';
+          const labelEl = $('.size__label', sizeEl);
+          sizeEl.insertBefore(chk, labelEl);
+        }
+        
+        // Update visual state
+        const isSelected = chk.checked;
+        sizeEl.classList.toggle('selected', isSelected);
       });
     } else {
       // Handle simple items
@@ -225,23 +244,57 @@ function composeBox() {
     return;
   }
 
-  // Decrement white tee (prefer XXL -> XS)
+  // Decrement white tee: prefer selected size, then XXL -> XS
   const whiteOrder = ['tshirt_white_male', 'tshirt_white_female'];
+  let decrementedWhite = false;
   for (const k of whiteOrder) {
-    const sizes = ITEMS.find((i) => i.key === k).sizes;
-    for (let idx = sizes.length - 1; idx >= 0; idx -= 1) {
-      const size = sizes[idx];
-      if (state[k][size] > 0) { state[k][size] -= 1; break; }
+    const sectionEl = document.querySelector(`.item[data-key="${k}"]`);
+    const selectedChk = sectionEl ? $('.size__check:checked', sectionEl) : null;
+    if (selectedChk) {
+      const sizeEl = selectedChk.closest('.size');
+      const size = sizeEl?.getAttribute('data-size');
+      if (size && state[k][size] > 0) { 
+        state[k][size] -= 1; 
+        decrementedWhite = true; 
+        break; 
+      }
+    }
+  }
+  if (!decrementedWhite) {
+    for (const k of whiteOrder) {
+      const sizes = ITEMS.find((i) => i.key === k).sizes;
+      for (let idx = sizes.length - 1; idx >= 0; idx -= 1) {
+        const size = sizes[idx];
+        if (state[k][size] > 0) { state[k][size] -= 1; decrementedWhite = true; break; }
+      }
+      if (decrementedWhite) break;
     }
   }
 
-  // Decrement black tee (prefer XXL -> XS)
+  // Decrement black tee: prefer selected size, then XXL -> XS
   const blackOrder = ['tshirt_black_male', 'tshirt_black_female'];
+  let decrementedBlack = false;
   for (const k of blackOrder) {
-    const sizes = ITEMS.find((i) => i.key === k).sizes;
-    for (let idx = sizes.length - 1; idx >= 0; idx -= 1) {
-      const size = sizes[idx];
-      if (state[k][size] > 0) { state[k][size] -= 1; break; }
+    const sectionEl = document.querySelector(`.item[data-key="${k}"]`);
+    const selectedChk = sectionEl ? $('.size__check:checked', sectionEl) : null;
+    if (selectedChk) {
+      const sizeEl = selectedChk.closest('.size');
+      const size = sizeEl?.getAttribute('data-size');
+      if (size && state[k][size] > 0) { 
+        state[k][size] -= 1; 
+        decrementedBlack = true; 
+        break; 
+      }
+    }
+  }
+  if (!decrementedBlack) {
+    for (const k of blackOrder) {
+      const sizes = ITEMS.find((i) => i.key === k).sizes;
+      for (let idx = sizes.length - 1; idx >= 0; idx -= 1) {
+        const size = sizes[idx];
+        if (state[k][size] > 0) { state[k][size] -= 1; decrementedBlack = true; break; }
+      }
+      if (decrementedBlack) break;
     }
   }
 
@@ -261,6 +314,15 @@ function composeBox() {
 
   composedBoxes += 1;
   messageEl.textContent = 'Бокс складено!';
+  
+  // Clear selected sizes after composing
+  ['tshirt_white_male','tshirt_white_female','tshirt_black_male','tshirt_black_female'].forEach((k) => {
+    const sectionEl = document.querySelector(`.item[data-key="${k}"]`);
+    if (sectionEl) {
+      $all('.size__check', sectionEl).forEach((c) => { c.checked = false; });
+    }
+  });
+  
   updateUI();
 }
 
@@ -285,6 +347,51 @@ function attachHandlers() {
         if (!sizeEl) return;
         const size = sizeEl.getAttribute('data-size');
         if (!size) return;
+        
+        if (target.classList.contains('size__check')) {
+          // Handle checkbox click
+          // Exclusive selection inside the group
+          $all('.size__check', el).forEach((c) => { 
+            if (c !== target) c.checked = false; 
+          });
+
+          // Mirror selection from white -> black (same gender groups)
+          const isChecked = target.checked === true;
+          const sourceKey = key;
+          let mirrorKey = null;
+          if (sourceKey === 'tshirt_white_male') mirrorKey = 'tshirt_black_male';
+          if (sourceKey === 'tshirt_white_female') mirrorKey = 'tshirt_black_female';
+
+          if (mirrorKey) {
+            const mirrorSection = document.querySelector(`.item[data-key="${mirrorKey}"]`);
+            if (mirrorSection) {
+              // uncheck all in mirror first
+              $all('.size__check', mirrorSection).forEach((c) => { 
+                if (c !== target) c.checked = false; 
+              });
+              if (isChecked) {
+                // check same size in mirror
+                const mirrorSizeEl = $(`.size[data-size="${size}"]`, mirrorSection);
+                const mirrorChk = mirrorSizeEl ? $('.size__check', mirrorSizeEl) : null;
+                if (mirrorChk) mirrorChk.checked = true;
+              }
+              // update mirror visuals
+              $all('.size', mirrorSection).forEach((sEl) => {
+                const chk = $('.size__check', sEl);
+                const sel = chk && chk.checked;
+                sEl.classList.toggle('selected', sel);
+              });
+            }
+          }
+
+          // update visual state on current section
+          $all('.size', el).forEach((sEl) => {
+            const chk = $('.size__check', sEl);
+            const sel = chk && chk.checked;
+            sEl.classList.toggle('selected', sel);
+          });
+          return;
+        }
         
         if (action === 'increment') increment(key, size);
         if (action === 'decrement') decrement(key, size);
@@ -321,11 +428,20 @@ function attachHandlers() {
 }
 
 async function init() {
+  // Initialize Supabase client
+  if (typeof window.supabase !== 'undefined') {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } else {
+    console.warn('Supabase not loaded, using localStorage only');
+  }
+  
   // Load from localStorage first
   loadFromLocalStorage();
   
-  // Try to load from server and merge
-  await loadStateFromServer();
+  // Try to load from server and merge (only if Supabase is available)
+  if (supabase) {
+    await loadStateFromServer();
+  }
   
   attachHandlers();
   updateUI();

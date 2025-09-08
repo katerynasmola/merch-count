@@ -247,6 +247,12 @@ h1 {
   font-size: 1.1rem;
 }
 
+.sync-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
 .sync-status {
   margin-top: 0.5rem;
   padding: 0.5rem;
@@ -263,6 +269,18 @@ h1 {
 .sync-status.error {
   background: rgba(239, 68, 68, 0.1);
   color: #dc2626;
+}
+
+/* T-shirt size checkboxes and selection */
+.size__check {
+  margin-right: 0.5rem;
+  accent-color: var(--text);
+}
+
+.size.selected {
+  background-color: var(--text) !important;
+  color: var(--card) !important;
+  border-color: var(--text) !important;
 }
 
 .integration__label {
