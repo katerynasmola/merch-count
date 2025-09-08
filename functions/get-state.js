@@ -1,17 +1,21 @@
-const { getMutableJSON } = require('@netlify/blobs');
-
 exports.handler = async () => {
   try {
-    const stateBlob = getMutableJSON('app-state', { siteID: process.env.SITE_ID || 'prod' });
-    const state = await stateBlob.get('current-state');
+    console.log('get-state called');
+    
+    // For now, just return empty state without using Blobs
+    // We'll add Blobs back once we confirm the function is being called
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(state || {}),
+      body: JSON.stringify({}),
     };
   } catch (error) {
-    console.error('Error getting state:', error);
-    return { statusCode: 500, body: 'Error getting state' };
+    console.error('Error in get-state:', error);
+    return { 
+      statusCode: 500, 
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: error.message })
+    };
   }
 };
 
