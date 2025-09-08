@@ -2,7 +2,5 @@
   "name": "tracker",
   "version": "1.0.0",
   "description": "Item tracking application",
-  "dependencies": {
-    "@netlify/blobs": "^0.0.1"
-  }
+  "dependencies": {}
 }
