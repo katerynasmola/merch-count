@@ -1,15 +1,30 @@
-const { getMutableJSON } = require('@netlify/blobs');
-
 exports.handler = async (event) => {
   try {
-    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+    console.log('set-state called with method:', event.httpMethod);
+    console.log('set-state body:', event.body);
+    
+    if (event.httpMethod !== 'POST') {
+      console.log('Method not allowed:', event.httpMethod);
+      return { statusCode: 405, body: 'Method Not Allowed' };
+    }
+    
     const newState = JSON.parse(event.body);
-    const stateBlob = getMutableJSON('app-state', { siteID: process.env.SITE_ID || 'prod' });
-    await stateBlob.set('current-state', newState);
-    return { statusCode: 200, body: 'State saved' };
+    console.log('Parsed state:', newState);
+    
+    // For now, just return success without using Blobs
+    // We'll add Blobs back once we confirm the function is being called
+    return { 
+      statusCode: 200, 
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: true, message: 'State received' })
+    };
   } catch (error) {
-    console.error('Error setting state:', error);
-    return { statusCode: 500, body: 'Error saving state' };
+    console.error('Error in set-state:', error);
+    return { 
+      statusCode: 500, 
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: error.message })
+    };
   }
 };
 
