@@ -1,3 +1,6 @@
+// Import the get-state module to access globalState
+const getStateModule = require('./get-state');
+
 exports.handler = async (event) => {
   try {
     console.log('=== SET-STATE CALLED ===');
@@ -11,9 +14,9 @@ exports.handler = async (event) => {
     const newState = JSON.parse(event.body);
     console.log('Parsed state:', newState);
     
-    // Save state to environment variable
-    process.env.APP_STATE = JSON.stringify(newState);
-    console.log('State saved to environment variable');
+    // Update global state in get-state module
+    getStateModule.updateGlobalState(newState);
+    console.log('State saved to global storage');
     
     return { 
       statusCode: 200, 

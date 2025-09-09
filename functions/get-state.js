@@ -1,23 +1,15 @@
+// Simple in-memory storage (will reset on function restart)
+let globalState = {};
+
 exports.handler = async (event) => {
   try {
     console.log('=== GET-STATE CALLED ===');
-    
-    // Try to get state from environment variable
-    const stateJson = process.env.APP_STATE || '{}';
-    let state = {};
-    
-    try {
-      state = JSON.parse(stateJson);
-      console.log('State loaded from environment:', state);
-    } catch (parseError) {
-      console.log('Error parsing state from environment:', parseError.message);
-      state = {};
-    }
+    console.log('Current state:', globalState);
     
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(state),
+      body: JSON.stringify(globalState),
     };
   } catch (error) {
     console.error('Error in get-state:', error);
@@ -27,6 +19,12 @@ exports.handler = async (event) => {
       body: JSON.stringify({ error: error.message })
     };
   }
+};
+
+// Function to update state (called by set-state)
+exports.updateGlobalState = (newState) => {
+  globalState = newState;
+  console.log('Global state updated:', globalState);
 };
 
 
