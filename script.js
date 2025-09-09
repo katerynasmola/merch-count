@@ -22,114 +22,26 @@ const state = ITEMS.reduce((acc, item) => {
   }
   return acc;
 }, {});
+
 let composedBoxes = 0;
+let lastComposeActions = [];
 
-// Supabase configuration
-const SUPABASE_URL = 'https://yhnikfjyxthkrmoqmpdy.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlobmlrZmp5eHRoa3Jtb3FtcGR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNjc3MDAsImV4cCI6MjA3Mjk0MzcwMH0.2RnIxl2HMoL4bZPzeLzXSnV0fjUcZNWUHMIvkal2Ma4';
-
-// Initialize Supabase client
-let supabase;
-
-// Auto-sync functionality
-let saveTimeout = null;
-
-async function loadStateFromServer() {
-  try {
-    const { data, error } = await supabase
-      .from('tracker_data')
-      .select('data')
-      .eq('id', 'main')
-      .single();
-    
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      console.warn('Failed to load state from Supabase:', error);
-      return false;
-    }
-    
-    if (data && data.data) {
-      const serverState = data.data;
-      // Merge server state with local state
-      Object.assign(state, serverState);
-      if (serverState.composedBoxes !== undefined) {
-        composedBoxes = serverState.composedBoxes;
-      }
-      console.log('State loaded from Supabase:', serverState);
-      return true;
-    }
-  } catch (error) {
-    console.warn('Failed to load state from Supabase:', error);
-  }
-  return false;
-}
-
-async function saveStateToServer() {
-  if (!supabase) {
-    console.warn('Supabase not available, skipping server save');
-    return false;
-  }
-  
-  try {
-    const stateToSave = {
-      ...state,
-      composedBoxes: composedBoxes
-    };
-    
-    const { error } = await supabase
-      .from('tracker_data')
-      .upsert({
-        id: 'main',
-        data: stateToSave,
-        updated_at: new Date().toISOString()
-      });
-    
-    if (error) {
-      console.warn('Failed to save state to Supabase:', error);
-      return false;
-    }
-    
-    console.log('State saved to Supabase');
-    return true;
-  } catch (error) {
-    console.warn('Failed to save state to Supabase:', error);
-    return false;
-  }
-}
-
-function scheduleSave() {
-  // Save to localStorage immediately
-  saveToLocalStorage();
-  
-  // Also save to server with delay
-  if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(saveStateToServer, 1000); // 1 second delay
-}
-
-function saveToLocalStorage() {
-  try {
-    localStorage.setItem('tracker_state', JSON.stringify(state));
-    localStorage.setItem('tracker_boxes', String(composedBoxes));
-  } catch (error) {
-    console.warn('Failed to save to localStorage:', error);
-  }
-}
-
-function loadFromLocalStorage() {
-  try {
-    const savedState = localStorage.getItem('tracker_state');
-    if (savedState) {
-      const parsed = JSON.parse(savedState);
-      Object.assign(state, parsed);
-    }
-    
-    const savedBoxes = localStorage.getItem('tracker_boxes');
-    if (savedBoxes) {
-      composedBoxes = parseInt(savedBoxes, 10) || 0;
-    }
-  } catch (error) {
-    console.warn('Failed to load from localStorage:', error);
-  }
-}
+const ITEM_THRESHOLDS = {
+  notebook: 30,
+  water_bottle: 30,
+  pen: 20,
+  pen_pad: 20,
+  box: 40,
+  lanyard: 20,
+  badge: 30,
+  stickers: 10,
+  postcards: 20,
+  // T-shirt thresholds (per size)
+  tshirt_white_male: 10,
+  tshirt_white_female: 10,
+  tshirt_black_male: 10,
+  tshirt_black_female: 10
+};
 
 function $(selector, root = document) {
   return root.querySelector(selector);
@@ -175,8 +87,8 @@ function updateUI() {
 
   $('#boxesCount').textContent = String(composedBoxes);
   
-  // Auto-save to server
-  scheduleSave();
+  // Auto-save to localStorage
+  saveToLocalStorage();
 }
 
 function increment(key, size = null) {
@@ -190,59 +102,53 @@ function increment(key, size = null) {
 
 function decrement(key, size = null) {
   if (size) {
-    if (state[key][size] > 0) {
-      state[key][size] -= 1;
-    }
+    if (state[key][size] > 0) state[key][size] -= 1;
   } else {
-    if (state[key] > 0) {
-      state[key] -= 1;
-    }
+    if (state[key] > 0) state[key] -= 1;
   }
   updateUI();
 }
 
-function sumSizesByKey(itemKey) {
-  return Object.values(state[itemKey]).reduce((a, b) => a + b, 0);
+function sumSizesByKey(key) {
+  const item = ITEMS.find((i) => i.key === key);
+  if (!item?.sizes) return 0;
+  return item.sizes.reduce((sum, size) => sum + (state[key][size] || 0), 0);
 }
 
 function canComposeBox() {
-  // Require at least one white tee (male or female) and one black tee (male or female)
-  const whiteOk = sumSizesByKey('tshirt_white_male') + sumSizesByKey('tshirt_white_female') > 0;
-  const blackOk = sumSizesByKey('tshirt_black_male') + sumSizesByKey('tshirt_black_female') > 0;
-
-  const othersOk = ITEMS.every((item) => {
-    if (item.key.startsWith('tshirt_')) return true; // handled above
+  const lacking = [];
+  
+  // Check t-shirts (at least one of each type)
+  const tshirtKeys = ['tshirt_white_male', 'tshirt_white_female', 'tshirt_black_male', 'tshirt_black_female'];
+  for (const key of tshirtKeys) {
+    if (sumSizesByKey(key) === 0) lacking.push(ITEMS.find((i) => i.key === key).label);
+  }
+  
+  // Check other items
+  ITEMS.forEach((item) => {
+    if (item.key.startsWith('tshirt_')) return;
     if (item.sizes) {
-      return Object.values(state[item.key]).reduce((a, b) => a + b, 0) > 0;
+      const total = item.sizes.reduce((sum, size) => sum + (state[item.key][size] || 0), 0);
+      if (total === 0) lacking.push(item.label);
+    } else {
+      if (state[item.key] === 0) lacking.push(item.label);
     }
-    return state[item.key] > 0;
   });
-
-  return whiteOk && blackOk && othersOk;
+  
+  return lacking;
 }
 
 function composeBox() {
+  const lacking = canComposeBox();
   const messageEl = $('#message');
-  if (!canComposeBox()) {
-    const lacking = [];
-    if (sumSizesByKey('tshirt_white_male') + sumSizesByKey('tshirt_white_female') <= 0) {
-      lacking.push('Футболка біла (будь-яка)');
-    }
-    if (sumSizesByKey('tshirt_black_male') + sumSizesByKey('tshirt_black_female') <= 0) {
-      lacking.push('Футболка чорна (будь-яка)');
-    }
-    ITEMS.forEach((item) => {
-      if (item.key.startsWith('tshirt_')) return;
-      if (item.sizes) {
-        const sum = Object.values(state[item.key]).reduce((a, b) => a + b, 0);
-        if (sum <= 0) lacking.push(item.label);
-      } else if (state[item.key] <= 0) {
-        lacking.push(item.label);
-      }
-    });
+  
+  if (lacking.length > 0) {
     messageEl.textContent = `Недостатньо: ${lacking.join(', ')}`;
     return;
   }
+
+  // Store actions for undo
+  lastComposeActions = [];
 
   // Decrement white tee: prefer selected size, then XXL -> XS
   const whiteOrder = ['tshirt_white_male', 'tshirt_white_female'];
@@ -255,6 +161,7 @@ function composeBox() {
       const size = sizeEl?.getAttribute('data-size');
       if (size && state[k][size] > 0) { 
         state[k][size] -= 1; 
+        lastComposeActions.push({ type: 'increment', key: k, size });
         decrementedWhite = true; 
         break; 
       }
@@ -265,7 +172,12 @@ function composeBox() {
       const sizes = ITEMS.find((i) => i.key === k).sizes;
       for (let idx = sizes.length - 1; idx >= 0; idx -= 1) {
         const size = sizes[idx];
-        if (state[k][size] > 0) { state[k][size] -= 1; decrementedWhite = true; break; }
+        if (state[k][size] > 0) { 
+          state[k][size] -= 1; 
+          lastComposeActions.push({ type: 'increment', key: k, size });
+          decrementedWhite = true; 
+          break; 
+        }
       }
       if (decrementedWhite) break;
     }
@@ -282,6 +194,7 @@ function composeBox() {
       const size = sizeEl?.getAttribute('data-size');
       if (size && state[k][size] > 0) { 
         state[k][size] -= 1; 
+        lastComposeActions.push({ type: 'increment', key: k, size });
         decrementedBlack = true; 
         break; 
       }
@@ -292,7 +205,12 @@ function composeBox() {
       const sizes = ITEMS.find((i) => i.key === k).sizes;
       for (let idx = sizes.length - 1; idx >= 0; idx -= 1) {
         const size = sizes[idx];
-        if (state[k][size] > 0) { state[k][size] -= 1; decrementedBlack = true; break; }
+        if (state[k][size] > 0) { 
+          state[k][size] -= 1; 
+          lastComposeActions.push({ type: 'increment', key: k, size });
+          decrementedBlack = true; 
+          break; 
+        }
       }
       if (decrementedBlack) break;
     }
@@ -302,13 +220,18 @@ function composeBox() {
   ITEMS.forEach((item) => {
     if (item.key.startsWith('tshirt_')) return;
     if (item.sizes) {
-      const sizesOrder = item.sizes;
-      for (let idx = sizesOrder.length - 1; idx >= 0; idx -= 1) {
-        const size = sizesOrder[idx];
-        if (state[item.key][size] > 0) { state[item.key][size] -= 1; break; }
+      const sizes = item.sizes;
+      for (let idx = sizes.length - 1; idx >= 0; idx -= 1) {
+        const size = sizes[idx];
+        if (state[item.key][size] > 0) { 
+          state[item.key][size] -= 1; 
+          lastComposeActions.push({ type: 'increment', key: item.key, size });
+          break; 
+        }
       }
     } else {
       state[item.key] -= 1;
+      lastComposeActions.push({ type: 'increment', key: item.key });
     }
   });
 
@@ -326,12 +249,35 @@ function composeBox() {
   updateUI();
 }
 
+function undoLastCompose() {
+  if (lastComposeActions.length === 0) {
+    $('#message').textContent = 'Немає дій для скасування';
+    return;
+  }
+
+  // Reverse all actions
+  lastComposeActions.reverse().forEach((action) => {
+    if (action.size) {
+      state[action.key][action.size] += 1;
+    } else {
+      state[action.key] += 1;
+    }
+  });
+
+  composedBoxes -= 1;
+  lastComposeActions = [];
+  $('#message').textContent = 'Останню дію скасовано';
+  updateUI();
+}
+
 function attachHandlers() {
   $('#composeBtn').addEventListener('click', composeBox);
+  $('#undoBtn').addEventListener('click', undoLastCompose);
 
   $all('.item').forEach((el) => {
     const key = el.dataset.key;
     const item = ITEMS.find((i) => i.key === key);
+
     el.addEventListener('click', (e) => {
       const target = e.target;
       if (!(target instanceof Element)) return;
@@ -402,51 +348,98 @@ function attachHandlers() {
     if (!item?.sizes) {
       const inputEl = $('.counter__input', el);
       if (inputEl) {
-        inputEl.addEventListener('input', () => {
-          const raw = inputEl.value.trim();
-          const parsed = Math.max(0, Number.parseInt(raw === '' ? '0' : raw, 10));
-          state[key] = Number.isFinite(parsed) ? parsed : 0;
-          updateUI();
+        inputEl.addEventListener('input', (e) => {
+          const value = parseInt(e.target.value) || 0;
+          if (value >= 0) {
+            state[key] = value;
+            updateUI();
+          }
         });
       }
     } else {
       // Handle manual input for sized items
-      $all('.size', el).forEach((sizeEl) => {
-        const size = sizeEl.getAttribute('data-size');
-        const inputEl = $('.counter__input', sizeEl);
-        if (!size || !inputEl) return;
-        
-        inputEl.addEventListener('input', () => {
-          const raw = inputEl.value.trim();
-          const parsed = Math.max(0, Number.parseInt(raw === '' ? '0' : raw, 10));
-          state[key][size] = Number.isFinite(parsed) ? parsed : 0;
-          updateUI();
+      $all('.counter__input', el).forEach((inputEl) => {
+        inputEl.addEventListener('input', (e) => {
+          const size = e.target.closest('.size').getAttribute('data-size');
+          const value = parseInt(e.target.value) || 0;
+          if (value >= 0 && size) {
+            state[key][size] = value;
+            updateUI();
+          }
         });
       });
     }
   });
 }
 
-async function init() {
-  // Initialize Supabase client
-  if (typeof window.supabase !== 'undefined') {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  } else {
-    console.warn('Supabase not loaded, using localStorage only');
+function saveToLocalStorage() {
+  try {
+    localStorage.setItem('tracker_state', JSON.stringify(state));
+    localStorage.setItem('tracker_boxes', String(composedBoxes));
+  } catch (error) {
+    console.warn('Failed to save to localStorage:', error);
   }
+}
+
+function loadFromLocalStorage() {
+  try {
+    const savedState = localStorage.getItem('tracker_state');
+    if (savedState) {
+      const parsed = JSON.parse(savedState);
+      Object.assign(state, parsed);
+    }
+    
+    const savedBoxes = localStorage.getItem('tracker_boxes');
+    if (savedBoxes) {
+      composedBoxes = parseInt(savedBoxes) || 0;
+    }
+  } catch (error) {
+    console.warn('Failed to load from localStorage:', error);
+  }
+}
+
+// Initialize with default values
+const initialState = {
+  notebook: 88,
+  water_bottle: 11,
+  pen: 102,
+  pen_pad: 43,
+  box: 7,
+  lanyard: 98,
+  badge: 57,
+  stickers: 100,
+  postcards: 35,
+  tshirt_white_male: { S: 15, M: 14, L: 9, XL: 9, XXL: 6 },
+  tshirt_white_female: { XS: 16, S: 16, M: 8, L: 15, XL: 10, XXL: 10 },
+  tshirt_black_male: { S: 14, M: 12, L: 15, XL: 5, XXL: 11 },
+  tshirt_black_female: { XS: 19, S: 14, M: 7, L: 14, XL: 7, XXL: 11 }
+};
+
+function seedInitialData() {
+  let hasData = false;
   
-  // Load from localStorage first
+  // Check if we have any data
+  ITEMS.forEach((item) => {
+    if (item.sizes) {
+      item.sizes.forEach((size) => {
+        if (state[item.key][size] > 0) hasData = true;
+      });
+    } else {
+      if (state[item.key] > 0) hasData = true;
+    }
+  });
+  
+  if (!hasData) {
+    Object.assign(state, initialState);
+    saveToLocalStorage();
+  }
+}
+
+function init() {
   loadFromLocalStorage();
-  
-  // Try to load from server and merge (only if Supabase is available)
-  if (supabase) {
-    await loadStateFromServer();
-  }
-  
+  seedInitialData();
   attachHandlers();
   updateUI();
 }
 
 document.addEventListener('DOMContentLoaded', init);
-
-

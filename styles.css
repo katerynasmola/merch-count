@@ -233,43 +233,6 @@ h1 {
   margin-top: 8px;
 }
 
-.sync-section {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.sync-section h3 {
-  margin: 0 0 1rem 0;
-  color: var(--text);
-  font-size: 1.1rem;
-}
-
-.sync-buttons {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.sync-status {
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  min-height: 1.2rem;
-}
-
-.sync-status.success {
-  background: rgba(34, 197, 94, 0.1);
-  color: #16a34a;
-}
-
-.sync-status.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-}
 
 /* T-shirt size checkboxes and selection */
 .size__check {

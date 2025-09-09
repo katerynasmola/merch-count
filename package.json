@@ -1,8 +1,5 @@
 {
   "name": "tracker",
   "version": "1.0.0",
-  "description": "Item tracking application",
-  "dependencies": {
-    "@supabase/supabase-js": "^2.39.0"
-  }
+  "description": "Item tracking application"
 }
