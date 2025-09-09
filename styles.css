@@ -233,19 +233,6 @@ h1 {
   margin-top: 8px;
 }
 
-
-/* T-shirt size checkboxes and selection */
-.size__check {
-  margin-right: 0.5rem;
-  accent-color: var(--text);
-}
-
-.size.selected {
-  background-color: var(--text) !important;
-  color: var(--card) !important;
-  border-color: var(--text) !important;
-}
-
 .integration__label {
   width: 220px;
 }

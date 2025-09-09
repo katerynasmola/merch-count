@@ -11,6 +11,7 @@
       <h1>Трекер комплектуючих</h1>
 
       <section class="items-grid" id="items">
+        
 
         <div class="tshirts-row">
           <div class="tshirts-section">
@@ -256,12 +257,14 @@
           </div>
         </div>
 
+
+
         <!-- Стікерпак -->
         <div class="item" data-key="stickers">
           <div class="item__title">Стікерпак</div>
           <div class="counter">
             <button class="btn btn--counter" data-action="decrement">−</button>
-            <input class="counter__input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" value="0" aria-label="Кількість: Стікерпак" />
+            <input class="counter__input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" value="0" aria-label="Кількість: Наліпки" />
             <button class="btn btn--counter" data-action="increment">+</button>
           </div>
         </div>
@@ -318,12 +321,33 @@
       </section>
 
       <section class="actions">
-        <button id="composeBtn" class="btn btn--primary">Скласти бокс</button>
+        <div class="compose-controls">
+          <button id="composeBtn" class="btn btn--primary">Скласти бокс</button>
+          <button id="undoBtn" class="btn">Назад</button>
+        </div>
         <div id="message" class="message" role="status" aria-live="polite"></div>
       </section>
 
       <section class="summary">
         <div class="summary__item">Складено боксів: <strong id="boxesCount">0</strong></div>
+      </section>
+
+      <section class="integrations">
+        <div class="section-title">Інтеграції</div>
+        <div class="integration slack">
+          <div class="integration__row">
+            <label for="slackWebhook" class="integration__label">Slack Webhook URL</label>
+            <input id="slackWebhook" class="counter__input integration__input" type="url" placeholder="https://hooks.slack.com/services/..." aria-label="Slack Webhook URL" />
+          </div>
+          <div class="integration__row">
+            <label for="slackUserId" class="integration__label">Slack User ID (для @тегу)</label>
+            <input id="slackUserId" class="counter__input integration__input" type="text" placeholder="U012ABCDEF" aria-label="Slack User ID" />
+          </div>
+          <div class="integration__row">
+            <button id="saveSlack" class="btn">Зберегти Slack налаштування</button>
+            <span id="slackSavedMsg" class="message" aria-live="polite"></span>
+          </div>
+        </div>
       </section>
     </main>
 
