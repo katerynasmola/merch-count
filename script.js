@@ -203,6 +203,10 @@ function updateUI() {
     console.log('🎨 State keys:', Object.keys(state));
     $all('.item').forEach((el) => {
       const key = el.dataset.key;
+      if (!key) {
+        console.warn('Item element missing data-key attribute:', el);
+        return;
+      }
       const item = ITEMS.find((i) => i.key === key);
       if (!item) {
         console.warn('Item not found for key:', key);
