@@ -541,13 +541,17 @@ function attachHandlers() {
           const raw = inputEl.value.trim();
           const parsed = Math.max(0, Number.parseInt(raw === '' ? '0' : raw, 10));
           state[key] = Number.isFinite(parsed) ? parsed : 0;
+          hasUnsavedChanges = true;
           updateUI();
+          saveAppState();
         });
 
         inputEl.addEventListener('blur', () => {
           const normalized = Math.max(0, Number.parseInt(inputEl.value || '0', 10));
           state[key] = Number.isFinite(normalized) ? normalized : 0;
+          hasUnsavedChanges = true;
           updateUI();
+          saveAppState();
         });
       }
     } else {
@@ -559,12 +563,16 @@ function attachHandlers() {
           const raw = inputEl.value.trim();
           const parsed = Math.max(0, Number.parseInt(raw === '' ? '0' : raw, 10));
           state[key][size] = Number.isFinite(parsed) ? parsed : 0;
+          hasUnsavedChanges = true;
           updateUI();
+          saveAppState();
         });
         inputEl.addEventListener('blur', () => {
           const normalized = Math.max(0, Number.parseInt(inputEl.value || '0', 10));
           state[key][size] = Number.isFinite(normalized) ? normalized : 0;
+          hasUnsavedChanges = true;
           updateUI();
+          saveAppState();
         });
       });
     }
