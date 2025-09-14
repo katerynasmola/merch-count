@@ -595,13 +595,84 @@ const STATE_KEYS = {
 
 async function saveToAPI() {
   try {
-    console.log('Saving to API...');
-    // Тут можна додати логіку для збереження в базу даних
-    // Наприклад, відправка POST запиту до API
-    console.log('API save completed');
+    console.log('Saving state to Supabase...');
+    
+    // Перевіряємо, чи ми в локальному середовищі
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    if (isLocal) {
+      console.log('Local environment - skipping Supabase save');
+      return;
+    }
+    
+    // Конвертуємо стан в формат для Supabase
+    const updates = [];
+    
+    for (const [itemKey, itemData] of Object.entries(state)) {
+      const item = ITEMS.find(i => i.key === itemKey);
+      if (!item) continue;
+      
+      if (item.sizes) {
+        // Для товарів з розмірами (футболки)
+        for (const [size, qty] of Object.entries(itemData)) {
+          const sku = getSKUFromItemKey(itemKey);
+          if (sku) {
+            updates.push({
+              sku: sku,
+              variant: size,
+              qty: qty
+            });
+          }
+        }
+      } else {
+        // Для товарів без розмірів
+        const sku = getSKUFromItemKey(itemKey);
+        if (sku) {
+          updates.push({
+            sku: sku,
+            variant: 'default',
+            qty: itemData
+          });
+        }
+      }
+    }
+    
+    console.log('Sending updates to Supabase:', updates);
+    
+    // Відправляємо оновлення до Supabase через Netlify функцію
+    const response = await fetch('/.netlify/functions/update-inventory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates })
+    });
+    
+    if (response.ok) {
+      console.log('State saved to Supabase successfully');
+    } else {
+      console.error('Failed to save to Supabase:', response.status);
+    }
   } catch (error) {
     console.error('Error saving to API:', error);
   }
+}
+
+function getSKUFromItemKey(itemKey) {
+  const keyMap = {
+    'notebook': 'notebook',
+    'water_bottle': 'bottle',
+    'pen': 'pen',
+    'pen_pad': 'wrist_pad',
+    'box': 'box',
+    'lanyard': 'lanyard',
+    'badge': 'badge_holder',
+    'stickers': 'sticker_pack',
+    'postcards': 'postcards',
+    'tshirt_white_male': 'mens_tshirt_white',
+    'tshirt_white_female': 'womens_tshirt_white',
+    'tshirt_black_male': 'mens_tshirt_black',
+    'tshirt_black_female': 'womens_tshirt_black'
+  };
+  return keyMap[itemKey] || null;
 }
 
 function saveAppState() {
@@ -609,7 +680,7 @@ function saveAppState() {
     localStorage.setItem(STATE_KEYS.inventory, JSON.stringify(state));
     localStorage.setItem(STATE_KEYS.boxes, String(composedBoxes));
     
-    // Також зберігаємо в API (асинхронно)
+    // Зберігаємо в Supabase (асинхронно)
     saveToAPI();
   } catch (_) {}
 }
@@ -863,10 +934,37 @@ async function init() {
     
     attachHandlers();
     updateUI();
+    
+    // Налаштовуємо автоматичне оновлення для синхронізації між браузерами
+    setupAutoSync();
+    
     console.log('App initialized successfully');
   } catch (error) {
     console.error('Error initializing app:', error);
   }
+}
+
+function setupAutoSync() {
+  const syncStatusEl = $('#syncStatus');
+  
+  // Оновлюємо дані кожні 10 секунд для синхронізації між браузерами
+  setInterval(async () => {
+    try {
+      console.log('Auto-syncing data...');
+      if (syncStatusEl) syncStatusEl.textContent = '🔄 Синхронізація...';
+      
+      await loadInventoryFromAPI();
+      updateUI();
+      
+      if (syncStatusEl) {
+        const now = new Date().toLocaleTimeString();
+        syncStatusEl.textContent = `✅ Останнє оновлення: ${now}`;
+      }
+    } catch (error) {
+      console.error('Auto-sync error:', error);
+      if (syncStatusEl) syncStatusEl.textContent = '❌ Помилка синхронізації';
+    }
+  }, 10000); // 10 секунд
 }
 
 document.addEventListener('DOMContentLoaded', init);
