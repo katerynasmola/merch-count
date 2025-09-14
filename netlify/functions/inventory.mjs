@@ -5,7 +5,19 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE
 );
 
-export async function handler() {
+export async function handler(event) {
+  // Обробляємо OPTIONS запити для CORS
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+      },
+      body: ''
+    };
+  }
   try {
     // Спочатку спробуємо завантажити з Supabase
     if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE) {

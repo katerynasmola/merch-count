@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Save to Supabase</title>
+</head>
+<body>
+    <h1>Тест збереження в Supabase</h1>
+    <p>Поточне значення блокнота: <span id="currentQty">Завантаження...</span></p>
+    <button id="decreaseBtn">Зменшити блокнот на 1</button>
+    <button id="checkBtn">Перевірити поточне значення</button>
+    <div id="log"></div>
+
+    <script>
+        const API_URL = 'https://merch-count1.netlify.app/.netlify/functions';
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += `[${new Date().toLocaleTimeString()}] ${message}<br>`;
+            console.log(message);
+        }
+
+        async function getCurrentQty() {
+            try {
+                const response = await fetch(`${API_URL}/inventory`);
+                const data = await response.json();
+                const notebook = data.inventory.find(item => item.sku === 'notebook');
+                return notebook ? notebook.qty : null;
+            } catch (error) {
+                log(`❌ Помилка завантаження: ${error.message}`);
+                return null;
+            }
+        }
+
+        async function updateQty(newQty) {
+            try {
+                log(`💾 Зберігаємо блокнот: ${newQty}`);
+                const response = await fetch(`${API_URL}/update-inventory`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        updates: [{ sku: 'notebook', variant: 'default', qty: newQty }]
+                    })
+                });
+                const result = await response.json();
+                log(`📤 Відповідь API: ${JSON.stringify(result)}`);
+                return result.success;
+            } catch (error) {
+                log(`❌ Помилка збереження: ${error.message}`);
+                return false;
+            }
+        }
+
+        async function updateDisplay() {
+            const qty = await getCurrentQty();
+            document.getElementById('currentQty').textContent = qty !== null ? qty : 'Помилка';
+            log(`📊 Поточна кількість: ${qty}`);
+        }
+
+        document.getElementById('decreaseBtn').addEventListener('click', async () => {
+            const currentQty = await getCurrentQty();
+            if (currentQty !== null && currentQty > 0) {
+                const newQty = currentQty - 1;
+                log(`🔄 Змінюємо з ${currentQty} на ${newQty}`);
+                const success = await updateQty(newQty);
+                if (success) {
+                    log('✅ Збереження успішне!');
+                    setTimeout(updateDisplay, 1000); // Перевіряємо через секунду
+                } else {
+                    log('❌ Збереження не вдалося!');
+                }
+            }
+        });
+
+        document.getElementById('checkBtn').addEventListener('click', updateDisplay);
+
+        // Початкове завантаження
+        updateDisplay();
+    </script>
+</body>
+</html>
