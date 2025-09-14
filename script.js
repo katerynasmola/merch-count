@@ -871,12 +871,15 @@ async function loadInventoryFromAPI() {
         }
       });
       console.log('State updated from API:', state);
+      return true; // Успішно завантажено з API
     }
+    return false; // Немає даних в API
   } catch (error) {
     console.error('Error loading inventory from API:', error);
     // Fallback to local data
     seedInitialInventoryIfEmpty();
     seedShirtSizesIfNotSeeded();
+    return false; // API не працює
   }
 }
 
@@ -919,17 +922,20 @@ async function init() {
   try {
     console.log('Initializing app...');
     
-    // Спочатку завантажуємо дані з API
-    await loadInventoryFromAPI();
+    // Спочатку завантажуємо дані з API (Supabase)
+    const apiLoaded = await loadInventoryFromAPI();
     
-    // Потім завантажуємо локальний стан (якщо є)
-    loadAppState();
-    
-    // Якщо API не працює, використовуємо seed дані
-    if (Object.keys(state).length === 0 || Object.values(state).every(v => v === 0)) {
-      console.log('Using seed data as fallback');
-      seedInitialInventoryIfEmpty();
-      seedShirtSizesIfNotSeeded();
+    // Тільки якщо API не працює, завантажуємо локальний стан
+    if (!apiLoaded) {
+      console.log('API failed, loading local state...');
+      loadAppState();
+      
+      // Якщо і локальний стан порожній, використовуємо seed дані
+      if (Object.keys(state).length === 0 || Object.values(state).every(v => v === 0)) {
+        console.log('Using seed data as fallback');
+        seedInitialInventoryIfEmpty();
+        seedShirtSizesIfNotSeeded();
+      }
     }
     
     attachHandlers();
