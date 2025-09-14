@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест Supabase</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-item { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        button { margin: 5px; padding: 5px 10px; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; white-space: pre-wrap; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Тест підключення до Supabase</h1>
+    
+    <div class="test-item">
+        <h3>Тест 1: Підключення до API</h3>
+        <button onclick="testConnection()">Тестувати підключення</button>
+        <div id="connection-log" class="log"></div>
+    </div>
+    
+    <div class="test-item">
+        <h3>Тест 2: Завантаження інвентарю</h3>
+        <button onclick="testInventory()">Завантажити інвентар</button>
+        <div id="inventory-log" class="log"></div>
+    </div>
+
+    <script>
+        function addToLog(elementId, message, type = 'info') {
+            const logDiv = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : '';
+            logDiv.innerHTML += `<span style="color: #666;">[${timestamp}]</span> <span class="${className}">${message}</span>\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        async function testConnection() {
+            const logDiv = document.getElementById('connection-log');
+            logDiv.innerHTML = '';
+            
+            addToLog('connection-log', 'Тестуємо підключення до Supabase...');
+            
+            try {
+                const response = await fetch('/.netlify/functions/inventory');
+                addToLog('connection-log', `HTTP Status: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addToLog('connection-log', `Джерело даних: ${data.source || 'unknown'}`, 'success');
+                    addToLog('connection-log', `Кількість товарів: ${data.inventory ? data.inventory.length : 0}`, 'success');
+                    
+                    if (data.inventory && data.inventory.length > 0) {
+                        addToLog('connection-log', 'Перші 3 товари:', 'info');
+                        data.inventory.slice(0, 3).forEach(item => {
+                            addToLog('connection-log', `  - ${item.name} (${item.sku}): ${item.qty} шт.`, 'info');
+                        });
+                    }
+                } else {
+                    const errorText = await response.text();
+                    addToLog('connection-log', `Помилка: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                addToLog('connection-log', `Помилка підключення: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testInventory() {
+            const logDiv = document.getElementById('inventory-log');
+            logDiv.innerHTML = '';
+            
+            addToLog('inventory-log', 'Завантажуємо інвентар...');
+            
+            try {
+                const response = await fetch('/.netlify/functions/inventory');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addToLog('inventory-log', `✅ Успішно завантажено ${data.inventory.length} товарів`, 'success');
+                    
+                    // Групуємо товари по типу
+                    const grouped = {};
+                    data.inventory.forEach(item => {
+                        if (!grouped[item.sku]) {
+                            grouped[item.sku] = [];
+                        }
+                        grouped[item.sku].push(item);
+                    });
+                    
+                    addToLog('inventory-log', '\n📦 Групи товарів:', 'info');
+                    Object.keys(grouped).forEach(sku => {
+                        const items = grouped[sku];
+                        const totalQty = items.reduce((sum, item) => sum + item.qty, 0);
+                        addToLog('inventory-log', `  ${items[0].name} (${sku}): ${totalQty} шт.`, 'info');
+                        
+                        if (items.some(item => item.variant)) {
+                            items.forEach(item => {
+                                if (item.variant) {
+                                    addToLog('inventory-log', `    - ${item.variant}: ${item.qty} шт.`, 'info');
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    const errorText = await response.text();
+                    addToLog('inventory-log', `❌ Помилка: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                addToLog('inventory-log', `❌ Помилка: ${error.message}`, 'error');
+            }
+        }
+        
+        // Автоматично тестуємо при завантаженні
+        window.addEventListener('load', () => {
+            addToLog('connection-log', 'Сторінка завантажена. Натисніть кнопки для тестування.');
+        });
+    </script>
+</body>
+</html>

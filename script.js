@@ -724,7 +724,7 @@ async function loadInventoryFromAPI() {
       data.inventory.forEach(item => {
         const key = getItemKeyFromSKU(item.sku);
         if (key) {
-          if (item.variant) {
+          if (item.variant && item.variant !== 'default') {
             // Для товарів з розмірами (футболки)
             if (!state[key]) state[key] = {};
             state[key][item.variant] = item.qty;
@@ -732,6 +732,8 @@ async function loadInventoryFromAPI() {
             // Для товарів без розмірів
             state[key] = item.qty;
           }
+        } else {
+          console.warn('Unknown SKU:', item.sku);
         }
       });
       console.log('State updated from API:', state);
@@ -746,6 +748,7 @@ async function loadInventoryFromAPI() {
 
 function getItemKeyFromSKU(sku) {
   const skuMap = {
+    // Старі SKU (для тестових даних)
     'NOTEBOOK': 'notebook',
     'WATER_BOTTLE': 'water_bottle',
     'PEN': 'pen',
@@ -758,7 +761,22 @@ function getItemKeyFromSKU(sku) {
     'TSHIRT_WHITE_MALE': 'tshirt_white_male',
     'TSHIRT_WHITE_FEMALE': 'tshirt_white_female',
     'TSHIRT_BLACK_MALE': 'tshirt_black_male',
-    'TSHIRT_BLACK_FEMALE': 'tshirt_black_female'
+    'TSHIRT_BLACK_FEMALE': 'tshirt_black_female',
+    
+    // Нові SKU з Supabase
+    'notebook': 'notebook',
+    'bottle': 'water_bottle',
+    'pen': 'pen',
+    'wrist_pad': 'pen_pad',
+    'box': 'box',
+    'lanyard': 'lanyard',
+    'badge_holder': 'badge',
+    'sticker_pack': 'stickers',
+    'postcards': 'postcards',
+    'mens_tshirt_white': 'tshirt_white_male',
+    'womens_tshirt_white': 'tshirt_white_female',
+    'mens_tshirt_black': 'tshirt_black_male',
+    'womens_tshirt_black': 'tshirt_black_female'
   };
   return skuMap[sku] || null;
 }
