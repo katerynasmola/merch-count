@@ -198,6 +198,7 @@ function $all(selector, root = document) {
 
 function updateUI() {
   try {
+    console.log('Updating UI with state:', state);
     $all('.item').forEach((el) => {
       const key = el.dataset.key;
       const item = ITEMS.find((i) => i.key === key);
@@ -211,7 +212,11 @@ function updateUI() {
       $all('.size', el).forEach((sizeEl) => {
         const size = sizeEl.getAttribute('data-size');
         const inputEl = $('.counter__input', sizeEl);
-        if (size && inputEl) inputEl.value = String(state[key][size]);
+        if (size && inputEl) {
+          const value = state[key][size] || 0;
+          inputEl.value = String(value);
+          console.log(`Updated ${key} ${size}: ${value}`);
+        }
         // ensure checkbox exists
         let chk = $('.size__check', sizeEl);
         if (!chk) {
@@ -236,7 +241,11 @@ function updateUI() {
       el.style.borderColor = '';
     } else {
       const inputEl = $('.counter__input', el);
-      if (inputEl) inputEl.value = String(state[key]);
+      if (inputEl) {
+        const value = state[key] || 0;
+        inputEl.value = String(value);
+        console.log(`Updated ${key}: ${value}`);
+      }
       const threshold = getThresholdForKey(key);
       applyLowStockVisual(el, state[key], threshold);
     }
@@ -712,12 +721,66 @@ function revertComposeEntry(entry) {
 async function loadInventoryFromAPI() {
   try {
     console.log('Loading inventory from API...');
-    const response = await fetch('/.netlify/functions/inventory');
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    
+    // Перевіряємо, чи ми в локальному середовищі
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    if (isLocal) {
+      console.log('Local environment detected, using test data');
+      // Використовуємо тестові дані для локального середовища
+      const testData = {
+        inventory: [
+          { stock_id: 1, sku: 'notebook', name: 'Блокнот', variant: 'default', qty: 88 },
+          { stock_id: 2, sku: 'bottle', name: 'Пляшка для води', variant: 'default', qty: 11 },
+          { stock_id: 3, sku: 'pen', name: 'Ручка', variant: 'default', qty: 102 },
+          { stock_id: 4, sku: 'wrist_pad', name: 'Підкладка під ручку', variant: 'default', qty: 43 },
+          { stock_id: 5, sku: 'box', name: 'Бокс', variant: 'default', qty: 7 },
+          { stock_id: 6, sku: 'lanyard', name: 'Стрічка для пропуска', variant: 'default', qty: 98 },
+          { stock_id: 7, sku: 'badge_holder', name: 'Бейдж для пропуска', variant: 'default', qty: 57 },
+          { stock_id: 8, sku: 'sticker_pack', name: 'Стікерпак', variant: 'default', qty: 100 },
+          { stock_id: 9, sku: 'postcards', name: 'Листівки', variant: 'default', qty: 35 },
+          // Футболки чоловічі білі
+          { stock_id: 10, sku: 'mens_tshirt_white', name: 'Футболка біла чоловіча', variant: 'S', qty: 15 },
+          { stock_id: 11, sku: 'mens_tshirt_white', name: 'Футболка біла чоловіча', variant: 'M', qty: 14 },
+          { stock_id: 12, sku: 'mens_tshirt_white', name: 'Футболка біла чоловіча', variant: 'L', qty: 9 },
+          { stock_id: 13, sku: 'mens_tshirt_white', name: 'Футболка біла чоловіча', variant: 'XL', qty: 9 },
+          { stock_id: 14, sku: 'mens_tshirt_white', name: 'Футболка біла чоловіча', variant: 'XXL', qty: 6 },
+          // Футболки чоловічі чорні
+          { stock_id: 15, sku: 'mens_tshirt_black', name: 'Футболка чорна чоловіча', variant: 'S', qty: 14 },
+          { stock_id: 16, sku: 'mens_tshirt_black', name: 'Футболка чорна чоловіча', variant: 'M', qty: 12 },
+          { stock_id: 17, sku: 'mens_tshirt_black', name: 'Футболка чорна чоловіча', variant: 'L', qty: 15 },
+          { stock_id: 18, sku: 'mens_tshirt_black', name: 'Футболка чорна чоловіча', variant: 'XL', qty: 5 },
+          { stock_id: 19, sku: 'mens_tshirt_black', name: 'Футболка чорна чоловіча', variant: 'XXL', qty: 11 },
+          // Футболки жіночі білі
+          { stock_id: 20, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'XS', qty: 16 },
+          { stock_id: 21, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'S', qty: 16 },
+          { stock_id: 22, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'M', qty: 8 },
+          { stock_id: 23, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'L', qty: 15 },
+          { stock_id: 24, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'XL', qty: 10 },
+          { stock_id: 25, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'XXL', qty: 10 },
+          // Футболки жіночі чорні
+          { stock_id: 26, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'XS', qty: 19 },
+          { stock_id: 27, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'S', qty: 14 },
+          { stock_id: 28, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'M', qty: 7 },
+          { stock_id: 29, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'L', qty: 14 },
+          { stock_id: 30, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'XL', qty: 7 },
+          { stock_id: 31, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'XXL', qty: 11 }
+        ]
+      };
+      
+      const data = testData;
+      console.log('Using test data for local development');
+    } else {
+      // Використовуємо реальний API на Netlify
+      const response = await fetch('/.netlify/functions/inventory');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('Inventory loaded from Supabase:', data);
     }
-    const data = await response.json();
-    console.log('Inventory loaded:', data);
+    
+    console.log('Number of items:', data.inventory ? data.inventory.length : 0);
     
     // Оновлюємо стан з даних API
     if (data.inventory && Array.isArray(data.inventory)) {
@@ -807,139 +870,6 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
-
-// ====== прості хелпери ======
-const $ = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-const statusEl = $('#status');
-
-function setStatus(msg, type = 'info') {
-  if (!statusEl) return;
-  statusEl.textContent = msg;
-  statusEl.style.color = type === 'error' ? '#b00020' : type === 'success' ? '#0a7d00' : '';
-}
-
-// ====== стан інвентаря в пам'яті браузера ======
-let inventory = []; // [{stock_id, sku, name, variant, qty}, ...]
-
-async function fetchInventory() {
-  const res = await fetch('/api/inventory', { cache: 'no-store' });
-  if (!res.ok) throw new Error('Не вдалося отримати інвентар');
-  const json = await res.json();
-  inventory = json.inventory || [];
-  return inventory;
-}
-
-// Прив'язуємо stock_id та кількості до карточок по data-sku + data-variant
-function renderInventory() {
-  let attached = 0;
-  for (const itemEl of $$('.item')) {
-    const sku = itemEl.dataset.sku;
-    const variant = itemEl.dataset.variant;
-    const match = inventory.find(r => r.sku === sku && r.variant === variant);
-    const qtyEl = $('[data-role="qty"]', itemEl);
-    const input = $('[data-role="select-qty"]', itemEl);
-
-    if (match) {
-      // збережемо stock_id на елементі, щоб потім відправити
-      itemEl.dataset.stockId = match.stock_id;
-      if (qtyEl) qtyEl.textContent = match.qty;
-      if (input) {
-        input.max = match.qty ?? 0;
-        // блокуємо, якщо немає залишку
-        input.disabled = match.qty <= 0;
-        if (parseInt(input.value, 10) > match.qty) input.value = match.qty;
-      }
-      attached++;
-    } else {
-      // якщо в інвентарі немає такого sku/variant — помітимо це
-      if (qtyEl) qtyEl.textContent = '—';
-      if (input) { input.disabled = true; input.value = 0; }
-      delete itemEl.dataset.stockId;
-    }
-  }
-  return attached;
-}
-
-async function refreshInventoryUI() {
-  try {
-    const inv = await fetchInventory();
-    const attached = renderInventory();
-    setStatus(`Оновлено: позицій на сторінці ${attached}/${inv.length}`);
-  } catch (e) {
-    console.error(e);
-    setStatus('Помилка завантаження інвентаря', 'error');
-  }
-}
-
-// Збір вибраних позицій у формат [{stock_id, qty}]
-function collectSelectedItems() {
-  const items = [];
-  for (const itemEl of $$('.item')) {
-    const input = $('[data-role="select-qty"]', itemEl);
-    const stockId = itemEl.dataset.stockId;
-    if (!input || !stockId) continue;
-    const n = parseInt(input.value, 10) || 0;
-    if (n > 0) items.push({ stock_id: stockId, qty: n });
-  }
-  return items;
-}
-
-async function submitBox() {
-  const items = collectSelectedItems();
-  if (items.length === 0) {
-    setStatus('Не вибрано жодної позиції', 'error');
-    return;
-  }
-  // валідація проти актуального qty (щоб не відправляти завідомо неможливе)
-  const bad = items.find(x => {
-    const it = inventory.find(i => i.stock_id === x.stock_id);
-    return !it || x.qty > it.qty;
-  });
-  if (bad) {
-    setStatus('Запит перевищує залишок. Онови сторінку і спробуй знову.', 'error');
-    return;
-  }
-
-  try {
-    setStatus('Зберігаємо бокс…');
-    const res = await fetch('/api/box', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items })
-    });
-    const text = await res.text();
-    if (res.status === 200) {
-      // очистимо вибрані
-      for (const input of $$('[data-role="select-qty"]')) input.value = 0;
-      setStatus('Бокс збережено ✔', 'success');
-      // перезавантажимо інвентар
-      await refreshInventoryUI();
-    } else if (res.status === 409) {
-      setStatus('Недостатньо на складі для однієї з позицій', 'error');
-      console.warn('409 body:', text);
-      await refreshInventoryUI();
-    } else {
-      setStatus(`Помилка: ${text}`, 'error');
-      console.error('box error:', res.status, text);
-    }
-  } catch (e) {
-    console.error(e);
-    setStatus('Мережева помилка при збереженні боксу', 'error');
-  }
-}
-
-function setup() {
-  // кнопка “Скласти бокс”
-  const btn = $('#submitBox');
-  if (btn) btn.addEventListener('click', submitBox);
-
-  // початкове завантаження і полінг кожні 8 сек
-  refreshInventoryUI();
-  setInterval(refreshInventoryUI, 8000);
-}
-
-document.addEventListener('DOMContentLoaded', setup);
 
 
 
