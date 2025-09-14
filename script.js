@@ -266,13 +266,17 @@ function updateUI() {
 
 function increment(key) {
   state[key] += 1;
+  hasUnsavedChanges = true;
   updateUI();
+  saveAppState();
 }
 
 function decrement(key) {
   if (state[key] > 0) {
     state[key] -= 1;
+    hasUnsavedChanges = true;
     updateUI();
+    saveAppState();
   }
 }
 
@@ -396,6 +400,12 @@ function composeBox() {
   composedBoxes += successful;
   hasUnsavedChanges = true; // Встановлюємо флаг незбережених змін
   console.log(`Successfully composed ${successful} boxes`);
+  
+  // Зберігаємо зміни в Supabase
+  if (successful > 0) {
+    console.log('💾 Saving composed box changes to Supabase...');
+    saveAppState();
+  }
   
   if (successful === requested) {
     messageEl.textContent = successful === 1 ? 'Бокс складено!' : `Складено боксів: ${successful}`;
@@ -531,12 +541,16 @@ function attachHandlers() {
         }
         if (action === 'increment') {
           state[key][size] += 1;
+          hasUnsavedChanges = true;
           updateUI();
+          saveAppState();
         }
         if (action === 'decrement') {
           if (state[key][size] > 0) {
             state[key][size] -= 1;
+            hasUnsavedChanges = true;
             updateUI();
+            saveAppState();
           }
         }
       }
