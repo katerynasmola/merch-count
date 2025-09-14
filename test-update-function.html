@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Update Function</title>
+</head>
+<body>
+    <h1>Тест функції update-inventory</h1>
+    <p>Поточне значення блокнота: <span id="currentQty">Завантаження...</span></p>
+    <button id="testUpdateBtn">Тестувати оновлення (qty = 5)</button>
+    <button id="checkBtn">Перевірити поточне значення</button>
+    <div id="log"></div>
+
+    <script>
+        const API_URL = 'https://merch-count1.netlify.app/.netlify/functions';
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += `[${new Date().toLocaleTimeString()}] ${message}<br>`;
+            console.log(message);
+        }
+
+        async function getCurrentQty() {
+            try {
+                const response = await fetch(`${API_URL}/inventory`);
+                const data = await response.json();
+                const notebook = data.inventory.find(item => item.sku === 'notebook');
+                return notebook ? notebook.qty : null;
+            } catch (error) {
+                log(`❌ Помилка завантаження: ${error.message}`);
+                return null;
+            }
+        }
+
+        async function testUpdate() {
+            try {
+                log(`🧪 Тестуємо оновлення блокнота на 5...`);
+                const response = await fetch(`${API_URL}/update-inventory`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        updates: [{ sku: 'notebook', variant: 'default', qty: 5 }]
+                    })
+                });
+                const result = await response.json();
+                log(`📤 Відповідь API: ${JSON.stringify(result)}`);
+                
+                if (result.success) {
+                    log('✅ API повернув успіх!');
+                    setTimeout(async () => {
+                        const newQty = await getCurrentQty();
+                        log(`🔍 Перевірка: поточна кількість = ${newQty}`);
+                        if (newQty === 5) {
+                            log('🎉 ОНОВЛЕННЯ ПРАЦЮЄ!');
+                        } else {
+                            log(`❌ ОНОВЛЕННЯ НЕ ПРАЦЮЄ! Очікувалося 5, отримано ${newQty}`);
+                        }
+                    }, 2000);
+                } else {
+                    log('❌ API повернув помилку!');
+                }
+            } catch (error) {
+                log(`❌ Помилка: ${error.message}`);
+            }
+        }
+
+        async function updateDisplay() {
+            const qty = await getCurrentQty();
+            document.getElementById('currentQty').textContent = qty !== null ? qty : 'Помилка';
+            log(`📊 Поточна кількість: ${qty}`);
+        }
+
+        document.getElementById('testUpdateBtn').addEventListener('click', testUpdate);
+        document.getElementById('checkBtn').addEventListener('click', updateDisplay);
+
+        // Початкове завантаження
+        updateDisplay();
+    </script>
+</body>
+</html>

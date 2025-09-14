@@ -41,7 +41,9 @@ export async function handler(event) {
 
     // Оновлюємо кожен товар в Supabase
     for (const update of updates) {
-      const { sku, variant, qty } = update;
+      const { sku, variant = 'default', qty } = update;
+      
+      console.log(`Processing update: sku=${sku}, variant=${variant}, qty=${qty}`);
       
       if (!sku || typeof qty !== 'number') {
         console.warn('Invalid update:', update);
@@ -87,19 +89,21 @@ export async function handler(event) {
         // Оновлюємо кількість в stock
         console.log(`Updating stock: item_id=${items.id}, variant=${variant}, qty=${qty}`);
         
-        const { error: stockError } = await supabase
+        const { data: updateResult, error: stockError } = await supabase
           .from('stock')
           .update({ 
             qty: qty,
             updated_at: new Date().toISOString()
           })
           .eq('item_id', items.id)
-          .eq('variant', variant);
+          .eq('variant', variant)
+          .select();
 
         if (stockError) {
           console.error('Error updating stock:', stockError);
         } else {
           console.log(`✅ Successfully updated ${sku} ${variant}: ${qty}`);
+          console.log('Update result:', updateResult);
         }
         
         // Перевіряємо, чи запис дійсно оновився
