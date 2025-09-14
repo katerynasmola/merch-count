@@ -1,0 +1,23 @@
+{
+  "name": "merch-count",
+  "version": "1.0.0",
+  "description": "",
+  "main": "script.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/katerynasmola/merch-count.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/katerynasmola/merch-count/issues"
+  },
+  "homepage": "https://github.com/katerynasmola/merch-count#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4"
+  }
+}
