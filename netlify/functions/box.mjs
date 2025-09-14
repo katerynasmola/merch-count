@@ -1,10 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE
-);
-
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -21,18 +14,22 @@ export async function handler(event) {
       }
     }
 
-    const { data: box_id, error } = await supabase.rpc('create_box', { p_items: items });
-    if (error) {
-      const code = /Insufficient stock/i.test(error.message) ? 409 : 500;
-      return { statusCode: code, body: JSON.stringify({ error: error.message }) };
-    }
+    // Симулюємо створення боксу (без Supabase)
+    const box_id = `box_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log('Box created:', box_id, 'with items:', items);
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ box_id })
+      body: JSON.stringify({ box_id, success: true })
     };
   } catch (e) {
-    return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+    console.error('Box creation error:', e);
+    return { 
+      statusCode: 500, 
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: e.message }) 
+    };
   }
 }

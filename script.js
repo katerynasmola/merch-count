@@ -93,13 +93,21 @@ async function sendSlackNotification(text) {
   const { webhook } = loadSlackConfig();
   if (!webhook) return false;
   try {
+    // Перевіряємо, чи ми в локальному середовищі
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocal) {
+      console.log('Slack notification (local mode):', text);
+      return true; // Симулюємо успішне відправлення в локальному режимі
+    }
+    
     const res = await fetch('/.netlify/functions/notify-slack', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ webhook, text }),
     });
     return res.ok;
-  } catch (_) {
+  } catch (error) {
+    console.error('Slack notification error:', error);
     return false;
   }
 }
@@ -189,10 +197,14 @@ function $all(selector, root = document) {
 }
 
 function updateUI() {
-  $all('.item').forEach((el) => {
-    const key = el.dataset.key;
-    const item = ITEMS.find((i) => i.key === key);
-    if (!item) return;
+  try {
+    $all('.item').forEach((el) => {
+      const key = el.dataset.key;
+      const item = ITEMS.find((i) => i.key === key);
+      if (!item) {
+        console.warn('Item not found for key:', key);
+        return;
+      }
 
     if (item.sizes) {
       const gridEl = $('.sizes-grid', el);
@@ -232,6 +244,9 @@ function updateUI() {
 
   $('#boxesCount').textContent = String(composedBoxes);
   checkThresholdsAndNotify();
+  } catch (error) {
+    console.error('Error updating UI:', error);
+  }
 }
 
 function increment(key) {
@@ -267,10 +282,12 @@ function canComposeBox() {
 }
 
 function composeBox() {
+  console.log('Compose box clicked');
   const messageEl = $('#message');
   const requested = 1; // always compose one box per click
 
   if (!canComposeBox()) {
+    console.log('Cannot compose box - insufficient items');
     const lacking = [];
     if (sumSizesByKey('tshirt_white_male') + sumSizesByKey('tshirt_white_female') <= 0) {
       lacking.push('Футболка біла (будь-яка)');
@@ -362,6 +379,8 @@ function composeBox() {
   }
 
   composedBoxes += successful;
+  console.log(`Successfully composed ${successful} boxes`);
+  
   if (successful === requested) {
     messageEl.textContent = successful === 1 ? 'Бокс складено!' : `Складено боксів: ${successful}`;
   } else if (successful > 0) {
@@ -386,7 +405,11 @@ function composeBox() {
 
 function undoLastCompose() {
   const entry = undoStack.pop();
-  if (!entry) return;
+  if (!entry) {
+    console.log('No operations to undo');
+    return;
+  }
+  console.log('Undoing:', entry);
   revertComposeEntry(entry);
   composedBoxes = Math.max(0, composedBoxes - 1);
   saveAppState();
@@ -394,9 +417,22 @@ function undoLastCompose() {
 }
 
 function attachHandlers() {
-  $('#composeBtn').addEventListener('click', composeBox);
+  console.log('Attaching event handlers...');
+  const composeBtn = $('#composeBtn');
+  if (composeBtn) {
+    composeBtn.addEventListener('click', composeBox);
+    console.log('Compose button handler attached');
+  } else {
+    console.error('Compose button not found!');
+  }
+  
   const undoBtn = $('#undoBtn');
-  if (undoBtn) undoBtn.addEventListener('click', undoLastCompose);
+  if (undoBtn) {
+    undoBtn.addEventListener('click', undoLastCompose);
+    console.log('Undo button handler attached');
+  } else {
+    console.warn('Undo button not found');
+  }
 
   $all('.item').forEach((el) => {
     const key = el.dataset.key;
@@ -637,11 +673,17 @@ function revertComposeEntry(entry) {
 }
 
 function init() {
-  loadAppState();
-  seedInitialInventoryIfEmpty();
-  seedShirtSizesIfNotSeeded();
-  attachHandlers();
-  updateUI();
+  try {
+    console.log('Initializing app...');
+    loadAppState();
+    seedInitialInventoryIfEmpty();
+    seedShirtSizesIfNotSeeded();
+    attachHandlers();
+    updateUI();
+    console.log('App initialized successfully');
+  } catch (error) {
+    console.error('Error initializing app:', error);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

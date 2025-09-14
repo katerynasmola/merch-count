@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Debug трекера</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-item { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        button { margin: 5px; padding: 5px 10px; }
+        input { width: 60px; text-align: center; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Debug трекера комплектуючих</h1>
+    
+    <div class="debug-item">
+        <h3>Тест 1: Базовий функціонал</h3>
+        <p>Кількість блокнотів: <button onclick="decrement('notebook')">-</button> 
+        <input type="number" id="notebook-count" value="0" readonly> 
+        <button onclick="increment('notebook')">+</button></p>
+        <p>Складено боксів: <span id="boxes-count">0</span></p>
+        <button onclick="composeBox()">Скласти бокс</button>
+        <button onclick="undoLastCompose()">Назад</button>
+    </div>
+    
+    <div class="debug-item">
+        <h3>Тест 2: Консоль</h3>
+        <div id="console-log" class="log"></div>
+    </div>
+
+    <script>
+        // Перехоплюємо console.log для відображення в UI
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        function addToLog(message, type = 'log') {
+            const logDiv = document.getElementById('console-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span style="color: #666;">[${timestamp}]</span> <span style="color: ${type === 'error' ? 'red' : type === 'warn' ? 'orange' : 'black'};">[${type.toUpperCase()}]</span> ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToLog(args.join(' '), 'log');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToLog(args.join(' '), 'error');
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToLog(args.join(' '), 'warn');
+        };
+        
+        // Спрощена версія для тестування
+        const state = {
+            notebook: 0,
+            pen: 0,
+            water_bottle: 0,
+            box: 0,
+            stickers: 0,
+            pen_pad: 0,
+            lanyard: 0,
+            badge: 0,
+            postcards: 0
+        };
+        
+        let composedBoxes = 0;
+        const undoStack = [];
+        
+        function updateUI() {
+            document.getElementById('notebook-count').value = state.notebook;
+            document.getElementById('boxes-count').textContent = composedBoxes;
+        }
+        
+        function increment(key) {
+            state[key] += 1;
+            updateUI();
+            console.log(`Incremented ${key}:`, state[key]);
+        }
+        
+        function decrement(key) {
+            if (state[key] > 0) {
+                state[key] -= 1;
+                updateUI();
+                console.log(`Decremented ${key}:`, state[key]);
+            }
+        }
+        
+        function canComposeBox() {
+            const canCompose = Object.values(state).every(qty => qty > 0);
+            console.log('Can compose box:', canCompose, 'State:', state);
+            return canCompose;
+        }
+        
+        function composeBox() {
+            console.log('Compose box clicked');
+            if (!canComposeBox()) {
+                console.log('Cannot compose box - insufficient items');
+                alert('Недостатньо компонентів для складання боксу');
+                return;
+            }
+            
+            const entry = {};
+            Object.keys(state).forEach(key => {
+                state[key] -= 1;
+                entry[key] = 1;
+            });
+            
+            undoStack.push(entry);
+            composedBoxes += 1;
+            updateUI();
+            console.log('Box composed!', entry);
+        }
+        
+        function undoLastCompose() {
+            const entry = undoStack.pop();
+            if (!entry) {
+                console.log('No operations to undo');
+                alert('Немає операцій для відкату');
+                return;
+            }
+            
+            Object.keys(entry).forEach(key => {
+                state[key] += 1;
+            });
+            
+            composedBoxes = Math.max(0, composedBoxes - 1);
+            updateUI();
+            console.log('Undone:', entry);
+        }
+        
+        // Ініціалізація
+        console.log('Debug page loaded');
+        updateUI();
+    </script>
+</body>
+</html>
