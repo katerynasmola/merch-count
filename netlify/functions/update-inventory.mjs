@@ -28,6 +28,8 @@ export async function handler(event) {
       }
 
       try {
+        console.log(`Looking for item: sku=${sku}, variant=${variant}`);
+        
         // Знаходимо товар за SKU та variant
         const { data: items, error: itemsError } = await supabase
           .from('items')
@@ -39,8 +41,12 @@ export async function handler(event) {
           console.error('Error finding item:', itemsError);
           continue;
         }
+        
+        console.log(`Found item with id: ${items.id}`);
 
         // Оновлюємо кількість в stock
+        console.log(`Updating stock: item_id=${items.id}, variant=${variant}, qty=${qty}`);
+        
         const { error: stockError } = await supabase
           .from('stock')
           .update({ 
@@ -53,7 +59,7 @@ export async function handler(event) {
         if (stockError) {
           console.error('Error updating stock:', stockError);
         } else {
-          console.log(`Updated ${sku} ${variant}: ${qty}`);
+          console.log(`✅ Successfully updated ${sku} ${variant}: ${qty}`);
         }
       } catch (itemError) {
         console.error('Error processing update:', itemError);

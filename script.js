@@ -68,6 +68,7 @@ const state = ITEMS.reduce((acc, item) => {
   return acc;
 }, {});
 let composedBoxes = 0;
+let hasUnsavedChanges = false; // Флаг для відстеження незбережених змін
 
 const SLACK_KEYS = {
   webhook: 'tracker_slack_webhook',
@@ -389,6 +390,7 @@ function composeBox() {
   }
 
   composedBoxes += successful;
+  hasUnsavedChanges = true; // Встановлюємо флаг незбережених змін
   console.log(`Successfully composed ${successful} boxes`);
   
   if (successful === requested) {
@@ -422,6 +424,7 @@ function undoLastCompose() {
   console.log('Undoing:', entry);
   revertComposeEntry(entry);
   composedBoxes = Math.max(0, composedBoxes - 1);
+  hasUnsavedChanges = true; // Встановлюємо флаг незбережених змін
   saveAppState();
   updateUI();
 }
@@ -596,7 +599,8 @@ const STATE_KEYS = {
 
 async function saveToAPI() {
   try {
-    console.log('Saving state to Supabase...');
+    console.log('💾 Saving state to Supabase...');
+    console.log('💾 Current state:', state);
     
     // Завжди зберігаємо в Supabase
     
@@ -643,11 +647,14 @@ async function saveToAPI() {
     
     if (response.ok) {
       console.log('State saved to Supabase successfully');
+      return true;
     } else {
       console.error('Failed to save to Supabase:', response.status);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
   } catch (error) {
     console.error('Error saving to API:', error);
+    throw error;
   }
 }
 
@@ -672,12 +679,21 @@ function getSKUFromItemKey(itemKey) {
 
 function saveAppState() {
   try {
+    console.log('💾 Saving app state...');
     localStorage.setItem(STATE_KEYS.inventory, JSON.stringify(state));
     localStorage.setItem(STATE_KEYS.boxes, String(composedBoxes));
     
     // Зберігаємо в Supabase (асинхронно)
-    saveToAPI();
-  } catch (_) {}
+    saveToAPI().then(() => {
+      hasUnsavedChanges = false; // Скидаємо флаг після успішного збереження
+      console.log('✅ Changes saved to Supabase');
+    }).catch((error) => {
+      console.error('❌ Failed to save to Supabase:', error);
+      // Не скидаємо флаг, якщо збереження не вдалося
+    });
+  } catch (error) {
+    console.error('Error saving app state:', error);
+  }
 }
 
 // One-time seeding of shirt sizes as requested
@@ -817,6 +833,7 @@ async function loadInventoryFromAPI() {
       });
       console.log('✅ State updated from API:', state);
       console.log('✅ State keys after API update:', Object.keys(state));
+      console.log('⚠️ WARNING: Data loaded from API - this may overwrite local changes!');
       return true; // Успішно завантажено з API
     }
     return false; // Немає даних в API
@@ -872,17 +889,17 @@ async function init() {
     const apiLoaded = await loadInventoryFromAPI();
     console.log('📡 API loaded:', apiLoaded);
     
-    // Тільки якщо API не працює, завантажуємо локальний стан
+    // Завантажуємо локальний стан тільки якщо API не працює
     if (!apiLoaded) {
-      console.log('⚠️ API failed, loading local state...');
+      console.log('📱 Loading local state...');
       loadAppState();
-      
-      // Якщо і локальний стан порожній, використовуємо seed дані
-      if (Object.keys(state).length === 0 || Object.values(state).every(v => v === 0)) {
-        console.log('🌱 Using seed data as fallback');
-        seedInitialInventoryIfEmpty();
-        seedShirtSizesIfNotSeeded();
-      }
+    }
+    
+    // Якщо API не працює і локальний стан порожній, використовуємо seed дані
+    if (!apiLoaded && (Object.keys(state).length === 0 || Object.values(state).every(v => v === 0))) {
+      console.log('🌱 Using seed data as fallback');
+      seedInitialInventoryIfEmpty();
+      seedShirtSizesIfNotSeeded();
     }
     
     attachHandlers();
@@ -903,6 +920,15 @@ function setupAutoSync() {
   // Оновлюємо дані кожні 10 секунд для синхронізації між браузерами
   setInterval(async () => {
     try {
+      // Пропускаємо синхронізацію, якщо є незбережені зміни
+      if (hasUnsavedChanges) {
+        console.log('⏸️ Skipping auto-sync - has unsaved changes');
+        if (syncStatusEl) syncStatusEl.textContent = '⏸️ Є незбережені зміни';
+        return;
+      }
+      
+      console.log('🔄 Auto-sync: hasUnsavedChanges =', hasUnsavedChanges);
+      
       console.log('Auto-syncing data...');
       if (syncStatusEl) syncStatusEl.textContent = '🔄 Синхронізація...';
       
