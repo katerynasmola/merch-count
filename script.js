@@ -461,28 +461,6 @@ function attachHandlers() {
     console.warn('Undo button not found');
   }
 
-  const refreshBtn = $('#refreshBtn');
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', async () => {
-      console.log('Refresh button clicked');
-      const messageEl = $('#message');
-      messageEl.textContent = 'Оновлення даних...';
-      
-      try {
-        await loadInventoryFromAPI();
-        updateUI();
-        messageEl.textContent = 'Дані оновлено!';
-        setTimeout(() => messageEl.textContent = '', 2000);
-      } catch (error) {
-        console.error('Error refreshing data:', error);
-        messageEl.textContent = 'Помилка оновлення даних';
-        setTimeout(() => messageEl.textContent = '', 3000);
-      }
-    });
-    console.log('Refresh button handler attached');
-  } else {
-    console.warn('Refresh button not found');
-  }
 
   $all('.item').forEach((el) => {
     const key = el.dataset.key;
