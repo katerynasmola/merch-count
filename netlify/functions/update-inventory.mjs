@@ -44,6 +44,25 @@ export async function handler(event) {
         
         console.log(`Found item with id: ${items.id}`);
 
+        // Спочатку перевіряємо, чи існує запис для оновлення
+        const { data: existingStock, error: findError } = await supabase
+          .from('stock')
+          .select('*')
+          .eq('item_id', items.id)
+          .eq('variant', variant);
+          
+        if (findError) {
+          console.error('Error finding stock record:', findError);
+          continue;
+        }
+        
+        if (!existingStock || existingStock.length === 0) {
+          console.error(`No stock record found for item_id=${items.id}, variant=${variant}`);
+          continue;
+        }
+        
+        console.log(`Found ${existingStock.length} stock record(s):`, existingStock);
+        
         // Оновлюємо кількість в stock
         console.log(`Updating stock: item_id=${items.id}, variant=${variant}, qty=${qty}`);
         
@@ -60,6 +79,20 @@ export async function handler(event) {
           console.error('Error updating stock:', stockError);
         } else {
           console.log(`✅ Successfully updated ${sku} ${variant}: ${qty}`);
+        }
+        
+        // Перевіряємо, чи запис дійсно оновився
+        const { data: checkData, error: checkError } = await supabase
+          .from('stock')
+          .select('qty')
+          .eq('item_id', items.id)
+          .eq('variant', variant)
+          .single();
+          
+        if (checkError) {
+          console.error('Error checking updated record:', checkError);
+        } else {
+          console.log(`Verified: ${sku} ${variant} now has qty: ${checkData.qty}`);
         }
       } catch (itemError) {
         console.error('Error processing update:', itemError);
