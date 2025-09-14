@@ -92,8 +92,7 @@ export async function handler(event) {
         const { data: updateResult, error: stockError } = await supabase
           .from('stock')
           .update({ 
-            qty: qty,
-            updated_at: new Date().toISOString()
+            qty: qty
           })
           .eq('item_id', items.id)
           .eq('variant', variant)
