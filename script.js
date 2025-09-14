@@ -646,4 +646,138 @@ function init() {
 
 document.addEventListener('DOMContentLoaded', init);
 
+// ====== прості хелпери ======
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+const statusEl = $('#status');
+
+function setStatus(msg, type = 'info') {
+  if (!statusEl) return;
+  statusEl.textContent = msg;
+  statusEl.style.color = type === 'error' ? '#b00020' : type === 'success' ? '#0a7d00' : '';
+}
+
+// ====== стан інвентаря в пам'яті браузера ======
+let inventory = []; // [{stock_id, sku, name, variant, qty}, ...]
+
+async function fetchInventory() {
+  const res = await fetch('/api/inventory', { cache: 'no-store' });
+  if (!res.ok) throw new Error('Не вдалося отримати інвентар');
+  const json = await res.json();
+  inventory = json.inventory || [];
+  return inventory;
+}
+
+// Прив'язуємо stock_id та кількості до карточок по data-sku + data-variant
+function renderInventory() {
+  let attached = 0;
+  for (const itemEl of $$('.item')) {
+    const sku = itemEl.dataset.sku;
+    const variant = itemEl.dataset.variant;
+    const match = inventory.find(r => r.sku === sku && r.variant === variant);
+    const qtyEl = $('[data-role="qty"]', itemEl);
+    const input = $('[data-role="select-qty"]', itemEl);
+
+    if (match) {
+      // збережемо stock_id на елементі, щоб потім відправити
+      itemEl.dataset.stockId = match.stock_id;
+      if (qtyEl) qtyEl.textContent = match.qty;
+      if (input) {
+        input.max = match.qty ?? 0;
+        // блокуємо, якщо немає залишку
+        input.disabled = match.qty <= 0;
+        if (parseInt(input.value, 10) > match.qty) input.value = match.qty;
+      }
+      attached++;
+    } else {
+      // якщо в інвентарі немає такого sku/variant — помітимо це
+      if (qtyEl) qtyEl.textContent = '—';
+      if (input) { input.disabled = true; input.value = 0; }
+      delete itemEl.dataset.stockId;
+    }
+  }
+  return attached;
+}
+
+async function refreshInventoryUI() {
+  try {
+    const inv = await fetchInventory();
+    const attached = renderInventory();
+    setStatus(`Оновлено: позицій на сторінці ${attached}/${inv.length}`);
+  } catch (e) {
+    console.error(e);
+    setStatus('Помилка завантаження інвентаря', 'error');
+  }
+}
+
+// Збір вибраних позицій у формат [{stock_id, qty}]
+function collectSelectedItems() {
+  const items = [];
+  for (const itemEl of $$('.item')) {
+    const input = $('[data-role="select-qty"]', itemEl);
+    const stockId = itemEl.dataset.stockId;
+    if (!input || !stockId) continue;
+    const n = parseInt(input.value, 10) || 0;
+    if (n > 0) items.push({ stock_id: stockId, qty: n });
+  }
+  return items;
+}
+
+async function submitBox() {
+  const items = collectSelectedItems();
+  if (items.length === 0) {
+    setStatus('Не вибрано жодної позиції', 'error');
+    return;
+  }
+  // валідація проти актуального qty (щоб не відправляти завідомо неможливе)
+  const bad = items.find(x => {
+    const it = inventory.find(i => i.stock_id === x.stock_id);
+    return !it || x.qty > it.qty;
+  });
+  if (bad) {
+    setStatus('Запит перевищує залишок. Онови сторінку і спробуй знову.', 'error');
+    return;
+  }
+
+  try {
+    setStatus('Зберігаємо бокс…');
+    const res = await fetch('/api/box', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items })
+    });
+    const text = await res.text();
+    if (res.status === 200) {
+      // очистимо вибрані
+      for (const input of $$('[data-role="select-qty"]')) input.value = 0;
+      setStatus('Бокс збережено ✔', 'success');
+      // перезавантажимо інвентар
+      await refreshInventoryUI();
+    } else if (res.status === 409) {
+      setStatus('Недостатньо на складі для однієї з позицій', 'error');
+      console.warn('409 body:', text);
+      await refreshInventoryUI();
+    } else {
+      setStatus(`Помилка: ${text}`, 'error');
+      console.error('box error:', res.status, text);
+    }
+  } catch (e) {
+    console.error(e);
+    setStatus('Мережева помилка при збереженні боксу', 'error');
+  }
+}
+
+function setup() {
+  // кнопка “Скласти бокс”
+  const btn = $('#submitBox');
+  if (btn) btn.addEventListener('click', submitBox);
+
+  // початкове завантаження і полінг кожні 8 сек
+  refreshInventoryUI();
+  setInterval(refreshInventoryUI, 8000);
+}
+
+document.addEventListener('DOMContentLoaded', setup);
+
+
 
