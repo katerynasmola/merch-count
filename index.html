@@ -237,15 +237,22 @@
           </div>
         </div>
 
-        <!-- Пляшка для води -->
-        <div class="item" data-key="water_bottle">
-          <div class="item__title">Пляшка для води</div>
-          <div class="counter">
-            <button class="btn btn--counter" data-action="decrement">−</button>
-            <input class="counter__input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" value="0" aria-label="Кількість: Пляшка для води" />
-            <button class="btn btn--counter" data-action="increment">+</button>
-          </div>
-        </div>
+      <!-- Пляшка для води -->
+<div class="item" data-sku="bottle" data-variant="default">
+  <div class="item__title">Пляшка для води</div>
+
+  <!-- покажемо актуальний залишок з БД -->
+  <div class="stock">Залишилось: <span data-role="qty">—</span></div>
+
+  <div class="counter">
+    <button class="btn btn--counter" data-action="decrement" data-role="dec">−</button>
+    <input class="counter__input" type="number" inputmode="numeric" pattern="[0-9]*"
+           min="0" step="1" value="0" aria-label="Кількість: Пляшка для води"
+           data-role="select-qty" />
+    <button class="btn btn--counter" data-action="increment" data-role="inc">+</button>
+  </div>
+</div>
+
 
         <!-- Бокс -->
         <div class="item" data-key="box">
