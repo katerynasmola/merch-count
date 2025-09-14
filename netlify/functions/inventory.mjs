@@ -1,6 +1,42 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE
+);
+
 export async function handler() {
   try {
-    // Повертаємо тестові дані, якщо Supabase не налаштований
+    // Спочатку спробуємо завантажити з Supabase
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE) {
+      try {
+        const { data, error } = await supabase
+          .from('stock')
+          .select('id, qty, variant, items ( sku, name )')
+          .order('id', { ascending: true });
+
+        if (error) throw error;
+
+        const inventory = (data || []).map(r => ({
+          stock_id: r.id,
+          sku: r.items?.sku,
+          name: r.items?.name,
+          variant: r.variant,
+          qty: r.qty
+        }));
+
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inventory, source: 'supabase' })
+        };
+      } catch (supabaseError) {
+        console.error('Supabase error:', supabaseError);
+        // Fallback to test data
+      }
+    }
+    
+    // Повертаємо тестові дані, якщо Supabase не налаштований або є помилка
     const inventory = [
       { stock_id: 1, sku: 'NOTEBOOK', name: 'Блокнот', variant: null, qty: 88 },
       { stock_id: 2, sku: 'WATER_BOTTLE', name: 'Пляшка для води', variant: null, qty: 11 },

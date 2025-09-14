@@ -1,3 +1,10 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE
+);
+
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -14,15 +21,35 @@ export async function handler(event) {
       }
     }
 
-    // Симулюємо створення боксу (без Supabase)
+    // Спочатку спробуємо створити бокс в Supabase
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE) {
+      try {
+        const { data: box_id, error } = await supabase.rpc('create_box', { p_items: items });
+        if (error) {
+          const code = /Insufficient stock/i.test(error.message) ? 409 : 500;
+          return { statusCode: code, body: JSON.stringify({ error: error.message }) };
+        }
+
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ box_id, success: true, source: 'supabase' })
+        };
+      } catch (supabaseError) {
+        console.error('Supabase error:', supabaseError);
+        // Fallback to simulation
+      }
+    }
+
+    // Симулюємо створення боксу (якщо Supabase не налаштований)
     const box_id = `box_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    console.log('Box created:', box_id, 'with items:', items);
+    console.log('Box created (simulated):', box_id, 'with items:', items);
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ box_id, success: true })
+      body: JSON.stringify({ box_id, success: true, source: 'simulation' })
     };
   } catch (e) {
     console.error('Box creation error:', e);

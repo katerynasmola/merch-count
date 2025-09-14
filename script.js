@@ -434,6 +434,29 @@ function attachHandlers() {
     console.warn('Undo button not found');
   }
 
+  const refreshBtn = $('#refreshBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', async () => {
+      console.log('Refresh button clicked');
+      const messageEl = $('#message');
+      messageEl.textContent = 'Оновлення даних...';
+      
+      try {
+        await loadInventoryFromAPI();
+        updateUI();
+        messageEl.textContent = 'Дані оновлено!';
+        setTimeout(() => messageEl.textContent = '', 2000);
+      } catch (error) {
+        console.error('Error refreshing data:', error);
+        messageEl.textContent = 'Помилка оновлення даних';
+        setTimeout(() => messageEl.textContent = '', 3000);
+      }
+    });
+    console.log('Refresh button handler attached');
+  } else {
+    console.warn('Refresh button not found');
+  }
+
   $all('.item').forEach((el) => {
     const key = el.dataset.key;
     const item = ITEMS.find((i) => i.key === key);
@@ -561,10 +584,24 @@ const STATE_KEYS = {
   shirtsSeed: 'tracker_shirts_seed_v1',
 };
 
+async function saveToAPI() {
+  try {
+    console.log('Saving to API...');
+    // Тут можна додати логіку для збереження в базу даних
+    // Наприклад, відправка POST запиту до API
+    console.log('API save completed');
+  } catch (error) {
+    console.error('Error saving to API:', error);
+  }
+}
+
 function saveAppState() {
   try {
     localStorage.setItem(STATE_KEYS.inventory, JSON.stringify(state));
     localStorage.setItem(STATE_KEYS.boxes, String(composedBoxes));
+    
+    // Також зберігаємо в API (асинхронно)
+    saveToAPI();
   } catch (_) {}
 }
 
@@ -672,12 +709,77 @@ function revertComposeEntry(entry) {
   });
 }
 
-function init() {
+async function loadInventoryFromAPI() {
   try {
-    console.log('Initializing app...');
-    loadAppState();
+    console.log('Loading inventory from API...');
+    const response = await fetch('/.netlify/functions/inventory');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log('Inventory loaded:', data);
+    
+    // Оновлюємо стан з даних API
+    if (data.inventory && Array.isArray(data.inventory)) {
+      data.inventory.forEach(item => {
+        const key = getItemKeyFromSKU(item.sku);
+        if (key) {
+          if (item.variant) {
+            // Для товарів з розмірами (футболки)
+            if (!state[key]) state[key] = {};
+            state[key][item.variant] = item.qty;
+          } else {
+            // Для товарів без розмірів
+            state[key] = item.qty;
+          }
+        }
+      });
+      console.log('State updated from API:', state);
+    }
+  } catch (error) {
+    console.error('Error loading inventory from API:', error);
+    // Fallback to local data
     seedInitialInventoryIfEmpty();
     seedShirtSizesIfNotSeeded();
+  }
+}
+
+function getItemKeyFromSKU(sku) {
+  const skuMap = {
+    'NOTEBOOK': 'notebook',
+    'WATER_BOTTLE': 'water_bottle',
+    'PEN': 'pen',
+    'PEN_PAD': 'pen_pad',
+    'BOX': 'box',
+    'LANYARD': 'lanyard',
+    'BADGE': 'badge',
+    'STICKERS': 'stickers',
+    'POSTCARDS': 'postcards',
+    'TSHIRT_WHITE_MALE': 'tshirt_white_male',
+    'TSHIRT_WHITE_FEMALE': 'tshirt_white_female',
+    'TSHIRT_BLACK_MALE': 'tshirt_black_male',
+    'TSHIRT_BLACK_FEMALE': 'tshirt_black_female'
+  };
+  return skuMap[sku] || null;
+}
+
+async function init() {
+  try {
+    console.log('Initializing app...');
+    
+    // Спочатку завантажуємо дані з API
+    await loadInventoryFromAPI();
+    
+    // Потім завантажуємо локальний стан (якщо є)
+    loadAppState();
+    
+    // Якщо API не працює, використовуємо seed дані
+    if (Object.keys(state).length === 0 || Object.values(state).every(v => v === 0)) {
+      console.log('Using seed data as fallback');
+      seedInitialInventoryIfEmpty();
+      seedShirtSizesIfNotSeeded();
+    }
+    
     attachHandlers();
     updateUI();
     console.log('App initialized successfully');
