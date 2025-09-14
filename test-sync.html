@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тест синхронізації</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-item { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; white-space: pre-wrap; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Тест синхронізації даних</h1>
+    
+    <div class="test-item">
+        <h3>Тест 1: Завантаження з API</h3>
+        <button onclick="testAPI()">Тестувати API</button>
+        <div id="api-log" class="log"></div>
+    </div>
+    
+    <div class="test-item">
+        <h3>Тест 2: Перевірка стану</h3>
+        <button onclick="testState()">Перевірити стан</button>
+        <div id="state-log" class="log"></div>
+    </div>
+
+    <div class="test-item">
+        <h3>Тест 3: Оновлення UI</h3>
+        <button onclick="testUI()">Оновити UI</button>
+        <div id="ui-log" class="log"></div>
+    </div>
+
+    <script>
+        // Копіюємо необхідні функції з основного скрипту
+        const ITEMS = [
+          { key: 'pen', label: 'Ручка' },
+          { key: 'tshirt_white_male', label: 'Футболка біла чоловіча', sizes: ['S','M','L','XL','XXL'] },
+          { key: 'tshirt_white_female', label: 'Футболка біла жіноча', sizes: ['XS','S','M','L','XL','XXL'] },
+          { key: 'tshirt_black_male', label: 'Футболка чорна чоловіча', sizes: ['S','M','L','XL','XXL'] },
+          { key: 'tshirt_black_female', label: 'Футболка чорна жіноча', sizes: ['XS','S','M','L','XL','XXL'] },
+          { key: 'notebook', label: 'Блокнот' },
+          { key: 'water_bottle', label: 'Пляшка для води' },
+          { key: 'box', label: 'Бокс' },
+          { key: 'stickers', label: 'Стікерпак' },
+          { key: 'pen_pad', label: 'Підкладка під ручку' },
+          { key: 'lanyard', label: 'Стрічка для пропуска' },
+          { key: 'badge', label: 'Бейдж для пропуска' },
+          { key: 'postcards', label: 'Листівки' }
+        ];
+
+        const state = ITEMS.reduce((acc, item) => {
+          if (item.sizes) {
+            acc[item.key] = Object.fromEntries(item.sizes.map((s) => [s, 0]));
+          } else {
+            acc[item.key] = 0;
+          }
+          return acc;
+        }, {});
+
+        function getItemKeyFromSKU(sku) {
+          const skuMap = {
+            'notebook': 'notebook',
+            'bottle': 'water_bottle',
+            'pen': 'pen',
+            'wrist_pad': 'pen_pad',
+            'box': 'box',
+            'lanyard': 'lanyard',
+            'badge_holder': 'badge',
+            'sticker_pack': 'stickers',
+            'postcards': 'postcards',
+            'mens_tshirt_white': 'tshirt_white_male',
+            'womens_tshirt_white': 'tshirt_white_female',
+            'mens_tshirt_black': 'tshirt_black_male',
+            'womens_tshirt_black': 'tshirt_black_female'
+          };
+          return skuMap[sku] || null;
+        }
+
+        async function loadInventoryFromAPI() {
+          try {
+            console.log('Loading inventory from API...');
+            
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            
+            if (isLocal) {
+              console.log('Local environment detected, using test data');
+              return false; // Для тестування
+            }
+            
+            const response = await fetch('/.netlify/functions/inventory');
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log('Inventory loaded:', data);
+            
+            if (data.inventory && Array.isArray(data.inventory)) {
+              data.inventory.forEach(item => {
+                const key = getItemKeyFromSKU(item.sku);
+                if (key) {
+                  if (item.variant && item.variant !== 'default') {
+                    if (!state[key]) state[key] = {};
+                    state[key][item.variant] = item.qty;
+                  } else {
+                    state[key] = item.qty;
+                  }
+                } else {
+                  console.warn('Unknown SKU:', item.sku);
+                }
+              });
+              console.log('State updated from API:', state);
+              return true;
+            }
+            return false;
+          } catch (error) {
+            console.error('Error loading inventory from API:', error);
+            return false;
+          }
+        }
+
+        function addToLog(elementId, message, type = 'info') {
+          const logDiv = document.getElementById(elementId);
+          const timestamp = new Date().toLocaleTimeString();
+          const className = type === 'success' ? 'success' : type === 'error' ? 'error' : '';
+          logDiv.innerHTML += `<span style="color: #666;">[${timestamp}]</span> <span class="${className}">${message}</span>\n`;
+          logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        async function testAPI() {
+          const logDiv = document.getElementById('api-log');
+          logDiv.innerHTML = '';
+          
+          addToLog('api-log', 'Тестуємо завантаження з API...');
+          
+          try {
+            const response = await fetch('/.netlify/functions/inventory');
+            addToLog('api-log', `HTTP Status: ${response.status}`, response.ok ? 'success' : 'error');
+            
+            if (response.ok) {
+              const data = await response.json();
+              addToLog('api-log', `Джерело: ${data.source || 'unknown'}`, 'success');
+              addToLog('api-log', `Кількість товарів: ${data.inventory ? data.inventory.length : 0}`, 'success');
+              
+              if (data.inventory && data.inventory.length > 0) {
+                addToLog('api-log', 'Перші 5 товарів:', 'info');
+                data.inventory.slice(0, 5).forEach(item => {
+                  addToLog('api-log', `  - ${item.name} (${item.sku}): ${item.qty} шт.`, 'info');
+                });
+              }
+            } else {
+              const errorText = await response.text();
+              addToLog('api-log', `Помилка: ${errorText}`, 'error');
+            }
+          } catch (error) {
+            addToLog('api-log', `Помилка: ${error.message}`, 'error');
+          }
+        }
+        
+        async function testState() {
+          const logDiv = document.getElementById('state-log');
+          logDiv.innerHTML = '';
+          
+          addToLog('state-log', 'Завантажуємо дані в стан...');
+          
+          try {
+            const success = await loadInventoryFromAPI();
+            addToLog('state-log', `API завантаження: ${success ? 'успішно' : 'не вдалося'}`, success ? 'success' : 'error');
+            
+            addToLog('state-log', 'Поточний стан:', 'info');
+            Object.entries(state).forEach(([key, value]) => {
+              if (typeof value === 'object') {
+                addToLog('state-log', `  ${key}: ${JSON.stringify(value)}`, 'info');
+              } else {
+                addToLog('state-log', `  ${key}: ${value}`, 'info');
+              }
+            });
+          } catch (error) {
+            addToLog('state-log', `Помилка: ${error.message}`, 'error');
+          }
+        }
+        
+        function testUI() {
+          const logDiv = document.getElementById('ui-log');
+          logDiv.innerHTML = '';
+          
+          addToLog('ui-log', 'Перевіряємо елементи на сторінці...');
+          
+          const items = document.querySelectorAll('.item[data-key]');
+          addToLog('ui-log', `Знайдено елементів: ${items.length}`, 'info');
+          
+          items.forEach((item, index) => {
+            const key = item.dataset.key;
+            const sku = item.dataset.sku;
+            addToLog('ui-log', `  ${index + 1}. ${key} (SKU: ${sku || 'немає'})`, 'info');
+          });
+        }
+        
+        // Автоматично тестуємо при завантаженні
+        window.addEventListener('load', () => {
+          addToLog('api-log', 'Сторінка завантажена. Натисніть кнопки для тестування.');
+        });
+    </script>
+</body>
+</html>

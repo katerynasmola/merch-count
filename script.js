@@ -198,7 +198,8 @@ function $all(selector, root = document) {
 
 function updateUI() {
   try {
-    console.log('Updating UI with state:', state);
+    console.log('🎨 Updating UI with state:', state);
+    console.log('🎨 State keys:', Object.keys(state));
     $all('.item').forEach((el) => {
       const key = el.dataset.key;
       const item = ITEMS.find((i) => i.key === key);
@@ -597,13 +598,7 @@ async function saveToAPI() {
   try {
     console.log('Saving state to Supabase...');
     
-    // Перевіряємо, чи ми в локальному середовищі
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    
-    if (isLocal) {
-      console.log('Local environment - skipping Supabase save');
-      return;
-    }
+    // Завжди зберігаємо в Supabase
     
     // Конвертуємо стан в формат для Supabase
     const updates = [];
@@ -639,8 +634,8 @@ async function saveToAPI() {
     
     console.log('Sending updates to Supabase:', updates);
     
-    // Відправляємо оновлення до Supabase через Netlify функцію
-    const response = await fetch('/.netlify/functions/update-inventory', {
+    // Відправляємо оновлення до Supabase через локальний проксі
+    const response = await fetch('http://localhost:3001/update-inventory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ updates })
@@ -791,65 +786,15 @@ function revertComposeEntry(entry) {
 
 async function loadInventoryFromAPI() {
   try {
-    console.log('Loading inventory from API...');
+    console.log('🔄 Loading inventory from API...');
     
-    // Перевіряємо, чи ми в локальному середовищі
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    
-    if (isLocal) {
-      console.log('Local environment detected, using test data');
-      // Використовуємо тестові дані для локального середовища
-      const testData = {
-        inventory: [
-          { stock_id: 1, sku: 'notebook', name: 'Блокнот', variant: 'default', qty: 88 },
-          { stock_id: 2, sku: 'bottle', name: 'Пляшка для води', variant: 'default', qty: 11 },
-          { stock_id: 3, sku: 'pen', name: 'Ручка', variant: 'default', qty: 102 },
-          { stock_id: 4, sku: 'wrist_pad', name: 'Підкладка під ручку', variant: 'default', qty: 43 },
-          { stock_id: 5, sku: 'box', name: 'Бокс', variant: 'default', qty: 7 },
-          { stock_id: 6, sku: 'lanyard', name: 'Стрічка для пропуска', variant: 'default', qty: 98 },
-          { stock_id: 7, sku: 'badge_holder', name: 'Бейдж для пропуска', variant: 'default', qty: 57 },
-          { stock_id: 8, sku: 'sticker_pack', name: 'Стікерпак', variant: 'default', qty: 100 },
-          { stock_id: 9, sku: 'postcards', name: 'Листівки', variant: 'default', qty: 35 },
-          // Футболки чоловічі білі
-          { stock_id: 10, sku: 'mens_tshirt_white', name: 'Футболка біла чоловіча', variant: 'S', qty: 15 },
-          { stock_id: 11, sku: 'mens_tshirt_white', name: 'Футболка біла чоловіча', variant: 'M', qty: 14 },
-          { stock_id: 12, sku: 'mens_tshirt_white', name: 'Футболка біла чоловіча', variant: 'L', qty: 9 },
-          { stock_id: 13, sku: 'mens_tshirt_white', name: 'Футболка біла чоловіча', variant: 'XL', qty: 9 },
-          { stock_id: 14, sku: 'mens_tshirt_white', name: 'Футболка біла чоловіча', variant: 'XXL', qty: 6 },
-          // Футболки чоловічі чорні
-          { stock_id: 15, sku: 'mens_tshirt_black', name: 'Футболка чорна чоловіча', variant: 'S', qty: 14 },
-          { stock_id: 16, sku: 'mens_tshirt_black', name: 'Футболка чорна чоловіча', variant: 'M', qty: 12 },
-          { stock_id: 17, sku: 'mens_tshirt_black', name: 'Футболка чорна чоловіча', variant: 'L', qty: 15 },
-          { stock_id: 18, sku: 'mens_tshirt_black', name: 'Футболка чорна чоловіча', variant: 'XL', qty: 5 },
-          { stock_id: 19, sku: 'mens_tshirt_black', name: 'Футболка чорна чоловіча', variant: 'XXL', qty: 11 },
-          // Футболки жіночі білі
-          { stock_id: 20, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'XS', qty: 16 },
-          { stock_id: 21, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'S', qty: 16 },
-          { stock_id: 22, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'M', qty: 8 },
-          { stock_id: 23, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'L', qty: 15 },
-          { stock_id: 24, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'XL', qty: 10 },
-          { stock_id: 25, sku: 'womens_tshirt_white', name: 'Футболка біла жіноча', variant: 'XXL', qty: 10 },
-          // Футболки жіночі чорні
-          { stock_id: 26, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'XS', qty: 19 },
-          { stock_id: 27, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'S', qty: 14 },
-          { stock_id: 28, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'M', qty: 7 },
-          { stock_id: 29, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'L', qty: 14 },
-          { stock_id: 30, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'XL', qty: 7 },
-          { stock_id: 31, sku: 'womens_tshirt_black', name: 'Футболка чорна жіноча', variant: 'XXL', qty: 11 }
-        ]
-      };
-      
-      const data = testData;
-      console.log('Using test data for local development');
-    } else {
-      // Використовуємо реальний API на Netlify
-      const response = await fetch('/.netlify/functions/inventory');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log('Inventory loaded from Supabase:', data);
+    // Завжди завантажуємо дані з API (Supabase) через локальний проксі
+    const response = await fetch('http://localhost:3001/inventory');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    const data = await response.json();
+    console.log('Inventory loaded from Supabase:', data);
     
     console.log('Number of items:', data.inventory ? data.inventory.length : 0);
     
@@ -870,7 +815,8 @@ async function loadInventoryFromAPI() {
           console.warn('Unknown SKU:', item.sku);
         }
       });
-      console.log('State updated from API:', state);
+      console.log('✅ State updated from API:', state);
+      console.log('✅ State keys after API update:', Object.keys(state));
       return true; // Успішно завантажено з API
     }
     return false; // Немає даних в API
@@ -920,19 +866,20 @@ function getItemKeyFromSKU(sku) {
 
 async function init() {
   try {
-    console.log('Initializing app...');
+    console.log('🚀 Initializing app...');
     
     // Спочатку завантажуємо дані з API (Supabase)
     const apiLoaded = await loadInventoryFromAPI();
+    console.log('📡 API loaded:', apiLoaded);
     
     // Тільки якщо API не працює, завантажуємо локальний стан
     if (!apiLoaded) {
-      console.log('API failed, loading local state...');
+      console.log('⚠️ API failed, loading local state...');
       loadAppState();
       
       // Якщо і локальний стан порожній, використовуємо seed дані
       if (Object.keys(state).length === 0 || Object.values(state).every(v => v === 0)) {
-        console.log('Using seed data as fallback');
+        console.log('🌱 Using seed data as fallback');
         seedInitialInventoryIfEmpty();
         seedShirtSizesIfNotSeeded();
       }
