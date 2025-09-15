@@ -642,8 +642,9 @@ async function saveToAPI() {
     
     console.log('Sending updates to Supabase:', updates);
     
-    // Відправляємо оновлення до Supabase через локальний проксі
-    const response = await fetch('http://localhost:3001/update-inventory', {
+    // Завжди оновлюємо через продакшен-функцію Netlify
+    const updateUrl = 'https://merch-count1.netlify.app/.netlify/functions/update-inventory';
+    const response = await fetch(updateUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ updates })
@@ -808,8 +809,8 @@ async function loadInventoryFromAPI() {
   try {
     console.log('🔄 Loading inventory from API...');
     
-    // Завжди завантажуємо дані з API (Supabase) через локальний проксі
-    const response = await fetch('http://localhost:3001/inventory');
+    // Завжди завантажуємо через продакшен-функцію Netlify
+    const response = await fetch('https://merch-count1.netlify.app/.netlify/functions/inventory');
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
